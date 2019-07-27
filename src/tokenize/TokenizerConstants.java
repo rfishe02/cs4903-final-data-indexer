@@ -11,28 +11,56 @@ public interface TokenizerConstants {
   /** End of File. */
   int EOF = 0;
   /** RegularExpression Id. */
-  int PLUS = 5;
+  int TAG = 1;
   /** RegularExpression Id. */
-  int MINUS = 6;
+  int TAG_WORD = 2;
   /** RegularExpression Id. */
-  int MULTIPLY = 7;
+  int TAG_EXIT = 3;
   /** RegularExpression Id. */
-  int DIVIDE = 8;
+  int TAG_ATTR = 4;
+  /** RegularExpression Id. */
+  int TAG_MISC = 5;
+  /** RegularExpression Id. */
+  int ATTR_WORD = 6;
+  /** RegularExpression Id. */
+  int ATTR_EXIT = 7;
+  /** RegularExpression Id. */
+  int ATTR_MISC = 8;
+  /** RegularExpression Id. */
+  int CHAR = 9;
+  /** RegularExpression Id. */
+  int WORD = 10;
+  /** RegularExpression Id. */
+  int NUMBER = 11;
+  /** RegularExpression Id. */
+  int MISC = 16;
 
   /** Lexical state. */
   int DEFAULT = 0;
+  /** Lexical state. */
+  int IN_TAG = 1;
+  /** Lexical state. */
+  int IN_DQATTR = 2;
 
   /** Literal token values. */
   String[] tokenImage = {
     "<EOF>",
+    "\"<\"",
+    "<TAG_WORD>",
+    "\">\"",
+    "\"\\\"\"",
+    "<TAG_MISC>",
+    "<ATTR_WORD>",
+    "\"\\\"\"",
+    "<ATTR_MISC>",
+    "<CHAR>",
+    "<WORD>",
+    "<NUMBER>",
     "\" \"",
     "\"\\r\"",
     "\"\\t\"",
     "\"\\n\"",
-    "\"+\"",
-    "\"-\"",
-    "\"*\"",
-    "\"/\"",
+    "<MISC>",
   };
 
 }

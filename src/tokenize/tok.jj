@@ -1,6 +1,91 @@
 /**
  * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
- */options{  static = true;}PARSER_BEGIN(Tokenizer)
+ */options{  static = false;}PARSER_BEGIN(Tokenizer)
 package tokenize;
+import java.io.*;
 
-public class Tokenizer{  public static void main(String args []) throws ParseException  {      }}PARSER_END(Tokenizer)SKIP :{  " "| "\r"| "\t"| "\n"}TOKEN : /* OPERATORS */{  < PLUS : "+" >| < MINUS : "-" >| < MULTIPLY : "*" >| < DIVIDE : "/" >}
+public class Tokenizer {  public static void main(String args []) throws ParseException {
+	if(args == null || args.length == 0) {
+	  
+	  	args = new String[2];
+		args[0] = "input/tokenize";
+		args[1] = "output/tokenize";
+	}
+
+	try {
+
+		BufferedInputStream bis; 
+		BufferedWriter bw;
+		Tokenizer tok;
+
+		File input = new File(args[0]);
+		File output = new File(args[1]);
+		File[] files = input.listFiles();
+
+		// For each file, tokenize it and write the tokens to a new directory.
+
+		for(File f : files) {
+
+			bis = new BufferedInputStream(new FileInputStream(f));
+			tok = new Tokenizer(bis);
+			bw = new BufferedWriter(new FileWriter(output.getPath()+"/"+f.getName()+".out"));
+
+			process(f,bw,tok); // Process the file with a tokenizer.
+ 
+			bw.close();
+			bis.close();
+
+		}
+	
+
+	} catch(IOException ex) {
+		ex.printStackTrace();
+		System.exit(1);
+	}
+      }
+
+  public static void process(File f, BufferedWriter bw, Tokenizer tok) throws IOException {
+
+	Token t = tok.getNextToken();
+
+	while( t.kind != Tokenizer.EOF ) {
+
+		bw.write(String.format("%-24s %-12s\n", t.image.toLowerCase(), Tokenizer.tokenImage[t.kind] )); // Write the token to a file.
+		t = tok.getNextToken();
+
+	}
+
+  }
+  }PARSER_END(Tokenizer)
+SKIP : {
+	< TAG : "<" > : IN_TAG
+}
+
+< IN_TAG > SKIP : {
+	< TAG_WORD : < WORD > >	
+}
+< IN_TAG > SKIP : {
+	< TAG_EXIT : ">" > : DEFAULT
+|   < TAG_ATTR : "\"" > : IN_DQATTR
+|   < TAG_MISC: ~[] > 
+} 
+
+< IN_DQATTR > TOKEN : {
+	< ATTR_WORD : < WORD > >	
+}
+< IN_DQATTR > SKIP : {
+	< ATTR_EXIT : "\"" > : IN_TAG
+|   < ATTR_MISC: ~[] >
+}
+TOKEN : {
+	< CHAR : ["a"-"z","A"-"Z"] >|   < WORD : (< CHAR >)+ >
+|   < NUMBER : (["0"-"9"])+>}
+
+SKIP : {
+  " "
+| "\r"
+| "\t"
+| "\n"
+| < MISC: ~[] > // If you place this above token, it won't capture <CHAR>.
+} 
+
