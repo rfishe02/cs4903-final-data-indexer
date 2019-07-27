@@ -6,7 +6,6 @@ public class Tokenizer implements TokenizerConstants {
   public static void main(String args []) throws ParseException {
 
         if(args == null || args.length == 0) {
-
                 args = new String[2];
                 args[0] = "input/tokenize";
                 args[1] = "output/tokenize";

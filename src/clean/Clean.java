@@ -7,7 +7,6 @@ public class Clean {
 	public static void main(String[] args) {
 
 		if (args == null || args.length == 0) {
-
 			args = new String[2];
 			args[0] = "output/tokenize";
 			args[1] = "output/clean";
