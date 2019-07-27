@@ -30,7 +30,7 @@ public class Tokenizer implements TokenizerConstants {
                         tok = new Tokenizer(bis);
                         bw = new BufferedWriter(new FileWriter(output.getPath()+"/"+f.getName()+".out"));
 
-                        process(f,bw,tok); // Process the file with a tokenizer.
+                        process(bw,tok); // Process the file with a tokenizer.
 
                         bw.close();
                         bis.close();
@@ -45,7 +45,7 @@ public class Tokenizer implements TokenizerConstants {
 
   }
 
-  public static void process(File f, BufferedWriter bw, Tokenizer tok) throws IOException {
+  public static void process(BufferedWriter bw, Tokenizer tok) throws IOException {
 
         Token t = tok.getNextToken();
 
