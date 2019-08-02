@@ -17,23 +17,31 @@ public interface TokenizerConstants {
   /** RegularExpression Id. */
   int TAG_EXIT = 3;
   /** RegularExpression Id. */
-  int TAG_ATTR = 4;
+  int DQTAG_ATTR = 4;
   /** RegularExpression Id. */
-  int TAG_MISC = 5;
+  int SQTAG_ATTR = 5;
   /** RegularExpression Id. */
-  int ATTR_WORD = 6;
+  int TAG_MISC = 6;
   /** RegularExpression Id. */
-  int ATTR_EXIT = 7;
+  int DQATTR_WORD = 7;
   /** RegularExpression Id. */
-  int ATTR_MISC = 8;
+  int DQATTR_EXIT = 8;
   /** RegularExpression Id. */
-  int CHAR = 9;
+  int DQATTR_MISC = 9;
   /** RegularExpression Id. */
-  int WORD = 10;
+  int SQATTR_WORD = 10;
   /** RegularExpression Id. */
-  int NUMBER = 11;
+  int SQATTR_EXIT = 11;
   /** RegularExpression Id. */
-  int MISC = 16;
+  int SQATTR_MISC = 12;
+  /** RegularExpression Id. */
+  int CHAR = 13;
+  /** RegularExpression Id. */
+  int WORD = 14;
+  /** RegularExpression Id. */
+  int NUMBER = 15;
+  /** RegularExpression Id. */
+  int MISC = 20;
 
   /** Lexical state. */
   int DEFAULT = 0;
@@ -41,6 +49,8 @@ public interface TokenizerConstants {
   int IN_TAG = 1;
   /** Lexical state. */
   int IN_DQATTR = 2;
+  /** Lexical state. */
+  int IN_SQATTR = 3;
 
   /** Literal token values. */
   String[] tokenImage = {
@@ -49,10 +59,14 @@ public interface TokenizerConstants {
     "<TAG_WORD>",
     "\">\"",
     "\"\\\"\"",
+    "\"\\\'\"",
     "<TAG_MISC>",
-    "<ATTR_WORD>",
+    "<DQATTR_WORD>",
     "\"\\\"\"",
-    "<ATTR_MISC>",
+    "<DQATTR_MISC>",
+    "<SQATTR_WORD>",
+    "\"\\\'\"",
+    "<SQATTR_MISC>",
     "<CHAR>",
     "<WORD>",
     "<NUMBER>",

@@ -1,6 +1,8 @@
+
 /**
  * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
- */options{  static = false;}PARSER_BEGIN(Tokenizer)
+ */
+options{  static = false;}PARSER_BEGIN(Tokenizer)
 package tokenize;
 import java.io.*;
 
@@ -19,6 +21,9 @@ public class Tokenizer {  public static void main(String args []) throws ParseE
 
 		File input = new File(args[0]);
 		File output = new File(args[1]);
+
+		output.mkdirs();
+		
 		File[] files = input.listFiles();
 
 		// For each file, tokenize it and write the tokens to a new directory.
@@ -57,24 +62,41 @@ public class Tokenizer {  public static void main(String args []) throws ParseE
   }
   }PARSER_END(Tokenizer)
 SKIP : {
-	< TAG : "<" > : IN_TAG
+  	< SCR_TAG : "<" (" ")* ("script"|"SCRIPT") (" ")* > : IN_SCRIPT
+| 	< TAG : "<" > : IN_TAG
 }
+
+
+< IN_SCRIPT > : {
+	<  >
+}
+
+/* In tag, general. */
 
 < IN_TAG > SKIP : {
 	< TAG_WORD : < WORD > >	
 }
 < IN_TAG > SKIP : {
 	< TAG_EXIT : ">" > : DEFAULT
-|   < TAG_ATTR : "\"" > : IN_DQATTR
+|   < DQTAG_ATTR : "\"" > : IN_DQATTR
+|   < SQTAG_ATTR : "'" > : IN_SQATTR
 |   < TAG_MISC: ~[] > 
 } 
 
 < IN_DQATTR > TOKEN : {
-	< ATTR_WORD : < WORD > >	
+	< DQATTR_WORD : < WORD > >	
 }
 < IN_DQATTR > SKIP : {
-	< ATTR_EXIT : "\"" > : IN_TAG
-|   < ATTR_MISC: ~[] >
+	< DQATTR_EXIT : "\"" > : IN_TAG
+|   < DQATTR_MISC: ~[] >
+}
+
+< IN_SQATTR > TOKEN : {
+	< SQATTR_WORD : < WORD > >	
+}
+< IN_SQATTR > SKIP : {
+	< SQATTR_EXIT : "'" > : IN_TAG
+|   < SQATTR_MISC: ~[] >
 }
 TOKEN : {
 	< CHAR : ["a"-"z","A"-"Z"] >|   < WORD : (< CHAR >)+ >
