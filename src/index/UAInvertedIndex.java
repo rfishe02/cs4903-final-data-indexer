@@ -30,7 +30,7 @@ import java.util.Set;
     	
 		public static void main(String[] args) throws IOException, FileNotFoundException {
 			UAInvertedIndex index = new UAInvertedIndex();
-			index.buildInvertedIndex("C:/Users/Owner/Documents/processedTokens/", "C:/Users/Owner/Documents/invertedIndexTemp"); 
+			index.buildInvertedIndex("./processedTokens/", "./invertedIndexFiles"); 
 		}	
 		
 		/**
@@ -245,8 +245,8 @@ import java.util.Set;
 				BufferedReader reader;
 				BufferedWriter writer;
 				File[] files = new File(inputDirectory).listFiles();
-				RandomAccessFile mapRaf = new RandomAccessFile("C:/Users/Owner/Documents/raf/mapRaf.raf", "rw");
-				BufferedWriter bw = new BufferedWriter(new FileWriter("C:/Users/Owner/Documents/raf/mapRaf.txt"));
+				RandomAccessFile mapRaf = new RandomAccessFile("./raf/mapRaf.raf", "rw");
+				BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/mapRaf.txt"));
 				int termId = 0;
 				
 				for (int i = 0; i < files.length; i++) {
@@ -254,11 +254,10 @@ import java.util.Set;
 					int totalFreq = 0;
 					docHashTable = new HashMap<String, Integer>();
 					reader = new BufferedReader(new FileReader(inputDirectory + i + "p.html.out"));
-                    if (i <= files.length / 2)
-                        writer = new BufferedWriter(new FileWriter(outputDirectory + "/doc" + i + ".temp"));
-                    else
-                        writer = new BufferedWriter(new FileWriter(outputDirectory + "1/doc" + i + ".temp"));
-
+					if (i <= files.length / 2 )
+						writer = new BufferedWriter(new FileWriter(outputDirectory + "/doc" + i + ".temp"));
+					else 
+						writer = new BufferedWriter(new FileWriter(outputDirectory + "1/doc" + i + ".temp"));
 					String input = reader.readLine();
 					
 					while (input != null) {
@@ -338,7 +337,7 @@ import java.util.Set;
 				bw.close();
 				mapRaf.close();
 				
-                files = new File(outputDirectory + "/").listFiles();
+		files = new File(outputDirectory + "/").listFiles();
                 File[] files2 = new File(outputDirectory + "1/").listFiles();
                 mergeFiles(files);
                 mergeFiles(files2);
@@ -359,12 +358,44 @@ import java.util.Set;
                 	}
                 }
                 
+               
                 writePostingRaf(merged, globalHashTable);
                 writeDictRaf(globalHashTable);
 
 			//end of buildInvertedIndex
+		}
+
+
+		public void mergeFiles(File[] files) throws IOException {
+	                int counter = 0;
+	                BufferedReader rightReader = null;
+	                BufferedReader leftReader = null;
+	                BufferedWriter bw = null;
+	                while (files.length > 500) {
+
+                        if (counter >= 500) {
+                                counter = 0;
+                                files = fileExistsArr(files);
+                                System.out.println(files.length);
 			}
 
+                                        int numLinesFile1 = -1;
+                                        int numLinesFile2 = -1;
+
+            					if (counter + 1 < files.length && files[counter] != null && files[counter + 1] != null && files[counter].isFile() && files[counter + 1].isFile()) {
+                                                numLinesFile1 = (int)Files.lines(Paths.get(files[counter].getPath())).count();
+                                                numLinesFile2 = (int)Files.lines(Paths.get(files[counter + 1].getPath())).count();
+                                        } else {
+                                                counter++;
+                                                continue;
+                                        }
+
+                                        merge(files[counter].getAbsolutePath(), files[counter + 1].getAbsolutePath(), numLinesFile1, numLinesFile2, files, counter, leftReader, rightReader, bw);
+                                        counter += 2;
+
+	                }
+
+		}
 	
 			/**
 			 * Counts the amount of existing files left
@@ -419,35 +450,6 @@ import java.util.Set;
 			public float idf(int totalDocs, int count) {
 				return (float)Math.log((float)totalDocs / count);
 			}
-			
-			public void mergeFiles(File[] files) throws IOException {
-                int counter = 0;
-                while (files.length > 1000) {
-
-                        if (counter >= 700) {
-                                                counter = 0;
-                                                System.out.println("pass");
-                                                files = fileExistsArr(files);
-                                                System.out.println(files.length);
-                                        }
-
-                                        int numLinesFile1 = -1;
-                                        int numLinesFile2 = -1;
-
-                    					if (counter + 1 < files.length && files[counter] != null && files[counter + 1] != null && files[counter].isFile() && files[counter + 1].isFile()) {
-                                                numLinesFile1 = (int)Files.lines(Paths.get(files[counter].getPath())).count();
-                                                numLinesFile2 = (int)Files.lines(Paths.get(files[counter + 1].getPath())).count();
-                                        } else {
-                                                counter++;
-                                                continue;
-                                        }
-
-                                        merge(files[counter].getAbsolutePath(), files[counter + 1].getAbsolutePath(), numLinesFile1, numLinesFile2, files, counter);
-                                        counter += 2;
-
-                }
-
-			}
 
 			/**
 			 * Merge method to merge together files to fit into about the 1000 file range that Linux can open.
@@ -461,15 +463,15 @@ import java.util.Set;
 			 * Time Complexity: O(d^3)
 			 * Space Complexity: O(D*d^2)
 			 */
-			private void merge(String file1, String file2, int numLinesFile1, int numLinesFile2, File[] files, int counter) throws IOException {
-				
+		private void merge(String file1, String file2, int numLinesFile1, int numLinesFile2, File[] files, int counter, BufferedReader leftReader, BufferedReader rightReader, BufferedWriter bw) throws IOException {
 				if (numLinesFile1 == -1 || numLinesFile2 == -1) {
 					return;
 				}
 				
-				BufferedReader leftReader  = new BufferedReader(new FileReader(file1));
-				BufferedReader rightReader = new BufferedReader(new FileReader(file2));
-				
+				leftReader  = new BufferedReader(new FileReader(file1));
+				rightReader = new BufferedReader(new FileReader(file2));
+                                bw = new BufferedWriter(new FileWriter(file1));
+			try {				
 				String[] leftArr 	= new String[numLinesFile1 + 1];
 				String[] rightArr 	= new String[numLinesFile2 + 1];
 				
@@ -491,12 +493,7 @@ import java.util.Set;
 				
 				rightArr[numLinesFile2] = "-1";
 				
-				rightReader.close();
-				leftReader.close();
-
-				
 				int i = 0, j = 0;
-				BufferedWriter bw = new BufferedWriter(new FileWriter(file1));
 				
 				for (int k = 0; k < numLinesFile2 + numLinesFile1; k++) {
 					
@@ -531,9 +528,13 @@ import java.util.Set;
 						}
 					}
 				}
-				
-				
+			} catch (IOException e) {
+				System.out.println(e.getMessage());
+			} finally {
+				rightReader.close();
+				leftReader.close();
 				bw.close();
+			}
 				files[counter + 1].delete();
 
 
@@ -546,14 +547,14 @@ import java.util.Set;
 			 * Space Complexity: O(V)
 			 */
 			public void writeDictRaf(GlobalHashTable ght) throws IOException {
-                RandomAccessFile dictRaf = new RandomAccessFile("C:/Users/Owner/Documents/raf/dict.raf", "rw");
-                BufferedWriter bw = new BufferedWriter(new FileWriter("C:/Users/Owner/Documents/raf/dict.txt"));
+                RandomAccessFile dictRaf = new RandomAccessFile("./raf/dict.raf", "rw");
+                BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/dict.txt"));
                 //Size = 22
                 for (int i = 0; i < ght.globalTable.length; i++) {
 
                 	GlobalWord current = ght.get(ght.globalTable[i]);
                 	if (current != null && current.word.equals("data")) {
-                		System.out.println();
+                		System.out.println("data");
                 	}
                 	if (current == null) {
                 		dictRaf.seek(i * 29);
@@ -586,9 +587,9 @@ import java.util.Set;
 			 * Space Complexity: O(V^2D^3)
 			 */
 			public void writePostingRaf(File[] files, GlobalHashTable globalHashTable) throws IOException {
-                RandomAccessFile postRaf = new RandomAccessFile("C:/Users/Owner/Documents/raf/post.raf", "rw");
+                RandomAccessFile postRaf = new RandomAccessFile("./raf/post.raf", "rw");
                 int recordCount = 0;
-                BufferedWriter bw = new BufferedWriter(new FileWriter("C:/Users/Owner/Documents/raf/post.txt"));
+                BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/post.txt"));
                 
             	BufferedReader[] readers = new BufferedReader[files.length];
                 
