@@ -30,36 +30,8 @@ public class UATokenizer {
     run(args);
   }
 
-  public static BufferedWriter[] getWriters(String path) {
-    BufferedWriter[] bw = null;
-
-    try {
-      String[] filenames = {"other.txt","email.txt","domain.txt","price.txt","word.txt","phone.txt"};
-      bw = new BufferedWriter[filenames.length];
-
-      for (int i = 0; i < filenames.length; i++) {
-        bw[i] = new BufferedWriter(new FileWriter(path+"/text/"+filenames[i]));
-      }
-
-    } catch(IOException ex) {
-      ex.printStackTrace();
-      System.exit(1);
-    }
-    return bw;
-  }
-
-  public static void closeWriters(BufferedWriter[] bw) {
-    try {
-      for(BufferedWriter b : bw) {
-        b.close();
-      }
-    } catch(IOException ex) {
-      System.exit(1);
-    }
-  }
-
   public static void run(String[] args) {
-    BufferedWriter bw2;
+    BufferedWriter bw;
     File[] zDir;
     int[] count = new int[7];
 
@@ -74,13 +46,12 @@ public class UATokenizer {
         (new File(args[1]+"/text/")).mkdir();
       }
 
-      BufferedWriter[] bw = getWriters(outDir.getPath());
       long start = System.currentTimeMillis();
 
       if(files == null) {
-        bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+inDir.getName()+".out"));
-        processFile(bw,bw2,inDir,count); // Process a single file.
-        bw2.close();
+        bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+inDir.getName()+".out"));
+        processFile(bw,inDir,count); // Process a single file.
+        bw.close();
       } else {
 
         for(File f : files) {
@@ -89,20 +60,18 @@ public class UATokenizer {
             if(zDir != null) {
 
                 for(File z : zDir) {
-                    bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+z.getName()+".out"));
-                    processFile(bw,bw2,z,count); // Process a files in a subdirectory.
-                    bw2.close();
+                    bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+z.getName()+".out"));
+                    processFile(bw,z,count); // Process a files in a subdirectory.
+                    bw.close();
                 }
 
             } else {
-                bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+f.getName()+".out"));
-                processFile(bw,bw2,f,count); // Process multiple files.
-                bw2.close();
+                bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+f.getName()+".out"));
+                processFile(bw,f,count); // Process multiple files.
+                bw.close();
             }
         }
       }
-      closeWriters(bw);
-      printResults(count,start);
 
     } catch(IOException ex) {
       ex.printStackTrace();
@@ -110,93 +79,20 @@ public class UATokenizer {
     }
   }
 
-  public static void processFile(BufferedWriter[] bw, BufferedWriter bw2, File f, int[] count) throws IOException {
+  public static void processFile(BufferedWriter bw, File f, int[] count) throws IOException {
     BufferedReader bis = new BufferedReader(new InputStreamReader(new FileInputStream(f),"UTF-8"));
     UATokenizer parser = new UATokenizer(bis);
-    Token t;
+    Token t = parser.getNextToken();
 
-    do {
+    while(t.kind != UATokenizerConstants.EOF) {
+      bw.write(fmt+"\n");
       t = parser.getNextToken();
-      recordToken(bw,bw2,t,count);
-
-    } while(t.kind != UATokenizerConstants.EOF);
+    }
 
       bis.close();
       count[1]++;
   }
-
-  public static void recordToken(BufferedWriter[] bw, BufferedWriter bw2, Token t, int[] count) {
-    try {
-      String type = UATokenizer.tokenImage[t.kind];
-      String fmt = t.image.toLowerCase();
-      //String fmt = t.image.toLowerCase()+" "+type;
-
-      if(t.image.length() > 2) {
-
-        bw2.write(fmt+"\n");
-        count[0]++; // Count number of tokens processed.
-
-        if(type.equals("<EMAIL>")    ||type.equals("<DQEMAIL>")   ||type.equals("<SQEMAIL>")||
-           type.equals("<JSEMAILSQ>")||type.equals("<JSEMAILDQ>")) {
-
-            bw[1].write(fmt+"\n");
-            count[2]++;
-
-        } else if(type.equals("<HTTPDOM>")||type.equals("<SQDOM>")   ||type.equals("<DQDOM>")||
-                  type.equals("<JSDOMSQ>")||type.equals("<JSDOMDQ>")) {
-
-            bw[2].write(fmt+"\n");
-            count[3]++;
-
-        } else if(type.equals("<PRICE>")  ||type.equals("<PRICE2>")    ||type.equals("<SQPRICE>")  ||
-                  type.equals("<DQPRICE>")||type.equals("<JSSQPRICE>") ||type.equals("<JSDQPRICE>")) {
-
-            bw[3].write(fmt+"\n");
-            count[4]++;
-
-        } else if(type.equals("<WORD>")    ||type.equals("<CONT>")    ||type.equals("<CROWDED>")  ||
-                  type.equals("<CROWDED2>")||type.equals("<BREV>")    ||type.equals("<SQWORD>")   ||
-                  type.equals("<DQWORD>")  ||type.equals("<JSWORDSQ>")||type.equals("<JSWORDDQ>")) {
-
-            /*
-            if(fmt.length() > 8) {
-                fmt = fmt.substring(0,9); // Reduce the size of the word to a length of 9.
-            }*/
-
-            bw[4].write(fmt+"\n");
-            count[5]++;
-
-        } else if(type.equals("<PHONE34>")  ||type.equals("<PHONE32>")   || type.equals("<PHONE58>")||
-                  type.equals("<JSPHONESQ>")||type.equals("<JSPHONEDQ>")) {
-
-            bw[5].write(fmt+"\n");
-            count[6]++;
-
-        }  else {
-            bw[0].write(fmt+"\n"); // Write remaining tokens to a separate file.
-        }
-      }
-
-    } catch(IOException ex) {
-      System.exit(1);
-    }
-  }
-
-  public static void printResults(int[] count, long start) {
-    try {
-      BufferedWriter bw = new BufferedWriter(new FileWriter("summary.txt"));
-      String[] label = {"Total tokens: ","Files processed: ","Emails found: ","Domains found: ","Prices found: ","Words found: ","Phone #s found:"};
-
-      bw.write("======= Project Gengar Tokenization Summary =======\n");
-      for(int i = 0; i < label.length; i++) {
-        bw.write(String.format("%-25s %-50d\n",label[i],count[i]));
-      }
-      bw.write(String.format("%-25s %-50.2f\n","Total runtime (seconds): ",(System.currentTimeMillis()-start)/1000.0));
-      bw.close();
-    } catch(IOException ex) {
-      System.exit(1);
-    }
-  }
+  
 }
 PARSER_END(UATokenizer)
 
