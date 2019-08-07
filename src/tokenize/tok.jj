@@ -83,7 +83,7 @@ public class UATokenizer {
     Token t = parser.getNextToken();
 
     while(t.kind != UATokenizerConstants.EOF) {
-      bw.write(fmt+"\n");
+      bw.write(t.image.toLowerCase()+"\n");
       t = parser.getNextToken();
     }
 
@@ -281,13 +281,9 @@ SKIP : {
 }
 
 SKIP : {
-  < HTTPDOM : ( (["a"-"z","A"-"Z","0"-"9"]){1,2} ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z"]){1,2} )+ > {
-      matchedToken.image = cleanHTML(matchedToken.image);
-  }
+  < HTTPDOM : ( (["a"-"z","A"-"Z","0"-"9"]){1,2} ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z"]){1,2} )+ >
 | < EMAIL : ( (["a"-"z","A"-"Z","0"-"9"]|<EMAILSYM>){1,2} )+ ( (["a"-"z","A"-"Z","0"-"9","="]|<EMAILSYM>){1,2} )?
-            "@" ( ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z","-"]){1,2} )+ > {
-      matchedToken.image = cleanEmail(matchedToken.image);
-  }
+            "@" ( ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z","-"]){1,2} )+ >
 }
 
 SKIP : {
