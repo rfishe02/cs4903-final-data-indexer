@@ -33,7 +33,6 @@ public class UATokenizer {
   public static void run(String[] args) {
     BufferedWriter bw;
     File[] zDir;
-    int[] count = new int[7];
 
     try {
       File inDir = new File(args[0]);
@@ -50,7 +49,7 @@ public class UATokenizer {
 
       if(files == null) {
         bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+inDir.getName()+".out"));
-        processFile(bw,inDir,count); // Process a single file.
+        processFile(bw,inDir); // Process a single file.
         bw.close();
       } else {
 
@@ -61,13 +60,13 @@ public class UATokenizer {
 
                 for(File z : zDir) {
                     bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+z.getName()+".out"));
-                    processFile(bw,z,count); // Process a files in a subdirectory.
+                    processFile(bw,z); // Process a files in a subdirectory.
                     bw.close();
                 }
 
             } else {
                 bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+f.getName()+".out"));
-                processFile(bw,f,count); // Process multiple files.
+                processFile(bw,f); // Process multiple files.
                 bw.close();
             }
         }
@@ -79,7 +78,7 @@ public class UATokenizer {
     }
   }
 
-  public static void processFile(BufferedWriter bw, File f, int[] count) throws IOException {
+  public static void processFile(BufferedWriter bw, File f) throws IOException {
     BufferedReader bis = new BufferedReader(new InputStreamReader(new FileInputStream(f),"UTF-8"));
     UATokenizer parser = new UATokenizer(bis);
     Token t = parser.getNextToken();
@@ -90,7 +89,6 @@ public class UATokenizer {
     }
 
       bis.close();
-      count[1]++;
   }
   
 }
@@ -153,7 +151,7 @@ SKIP : {
 }
 
 SKIP : {
-  < ALPHA : (["a"-"z","A"-"Z"] | ("\\u00"["4"-"7"]["0"-"9","A"-"F"]) | ("\\u00"["A"-"F"]["0"-"9","A"-"F"]) ) >
+  < ALPHA : (["a"-"z","A"-"Z"]|["\u00C0"-"\u00FF"]|["\u0100"-"\u017F"]|["\u0100"-"\u017F"]|["\u0180"-"\u024F"]|["\u1E02"-"\u1EF3"]) >
 }
 
 /* ============================================================================================
@@ -508,7 +506,6 @@ TOKEN : {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 | < WORD : < ALPHA > ( < ALPHA > )+ >
-
 | < SIGNUM : (<NUMBER>){2,4} >
 }
 
