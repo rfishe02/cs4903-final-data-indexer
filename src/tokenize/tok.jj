@@ -61,7 +61,7 @@ public class UATokenizer {
                 for(File z : zDir) {
                     tmp =  new File( outDir.getName()+"/"+f.getName() );
                     tmp.mkdir();
-                    
+
                     bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+z.getName()+".out"));
                     processFile(bw,z); // Process a files in a subdirectory.
                     bw.close();
@@ -76,6 +76,11 @@ public class UATokenizer {
                 bw.close();
             }
         }
+
+        BufferedWriter end = new BufferedWriter(new FileWriter( "done.txt" ));
+        end.write((System.currentTimeMillis()-start)+"\n");
+        end.close();
+
       }
 
     } catch(IOException ex) {
