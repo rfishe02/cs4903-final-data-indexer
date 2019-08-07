@@ -107,14 +107,6 @@ TOKEN_MGR_DECLS : {
     return str;
   }
 
-  public String cleanHTML(String str) {
-    return str.replaceAll("[\\.]", " ");
-  }
-
-  public String cleanEmail(String str) {
-    return str.replaceAll("[@\\.]", " ");
-  }
-
 }
 
 /* ============================================================================================
@@ -173,23 +165,11 @@ SKIP : {
    When we enter a script tag, use different tokenization techniques depending on the type.
  -------------------------------------------------------------------------------------------- */
 
-// "header", "company"
-
 < IN_SCRIPT > SKIP : {
   < ENDJS : "<" (" ")*"/"(" ")* ("script"|"SCRIPT") > : DEFAULT
 | < SCRIPTCMT : "/*" > : IN_SC_CMT
-| < JSSQ :
-(
-  "name"|"url"|"title"|"desc"("ription")?|"text"|"caption"|"category"|"href"|"price"
-  |"keyword"("s")?|"brand"|"domain"|"email"|"alt"|"vendor"|("tele")?"phone"
-  |"alias"|"headline"|"tag"|"subtitle"|"excerpt"|"company"|"address"
-) (" ")*"'" (" ")*":" (" ")*"'" > : IN_JSSQ
-| < JSDQ :
-(
-  "name"|"url"|"title"|"desc"("ription")?|"text"|"caption"|"category"|"href"|"price"
-  |"keyword"("s")?|"brand"|"domain"|"email"|"alt"|"vendor"|("tele")?"phone"
-  |"alias"|"headline"|"tag"|"subtitle"|"excerpt"|"company"|"address"
-) (" ")*"\"" (" ")*":" (" ")*"\"" > : IN_JSDQ
+| < JSSQ : "'" > : IN_JSSQ
+| < JSDQ : "\"" > : IN_JSDQ
 | < SCRIPTTAGMISC : ~[] >
 }
 
@@ -316,12 +296,10 @@ SKIP : {
 
 /* ============================================================================================
    Skip parts of the url that may contribute more garbage than relevant information.
-   Only retain HTML domains, parts of the url, email addresses that seem useful.
  ============================================================================================ */
 
 SKIP : {
   < HTTP : (["a"-"z"])+"://" >
-| < PORT : ":"(["0"-"9"]){4,8} >
 | < HTTPJNKSQ : ["&","?"] ( (["a"-"z","A"-"Z","0"-"9"]|<HTTPSYM>|"\""){1,2} )+ ( <HTTPDOM> )?  >
 | < HTTPJNKDQ : ["&","?"] ( (["a"-"z","A"-"Z","0"-"9"]|<HTTPSYM>|"'"){1,2} )+ ( <HTTPDOM> )?  >
 }
@@ -359,7 +337,7 @@ TOKEN : {
 }
 
 /* --------------------------------------------------------------------------------------------
-   The following identifies basic words / numbers.
+   The following identifies basic words.
  -------------------------------------------------------------------------------------------- */
 
  TOKEN : {
@@ -375,11 +353,6 @@ TOKEN : {
   }
 | < WORD : < ALPHA > ( < ALPHA > )+ >
 }
-
-/*
-TOKEN : {
-  < SIGNUM : (["0"-"9"]){2,4} >
-}*/
 
 SKIP : {
   < ENGSYMB : "&" ( "#" (["0"-"9"]){1} ( (["0"-"9"]){1} | ((["0"-"5"]){1}|(["7"-"9"]){1}) (["0"-"9"]){1} )
