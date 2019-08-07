@@ -199,16 +199,6 @@ SKIP : {
 | < JSSQMISC : ~[] >
 }
 
-/*
-| < JSDQOT : <OPENTAG> > : IN_JSDQOPEN_TAG
-| < JSDQCT : <CLOSETAG> >
-
-< IN_JSDQOPEN_TAG > SKIP : {
-  < ENDJSDQOPTAG : (">") > : IN_JSDQ
-| < JSDQOPENMISC : ~[] >
-}
-*/
-
 < IN_JSDQ > SKIP : {
   < ENDJSDQ : "\"" > : IN_SCRIPT
 | < JSDQHTTP : <HTTP> >
@@ -241,16 +231,13 @@ SKIP : {
 
 < IN_OPEN_TAG > SKIP : {
   < ENDOPTAG : (">") > : DEFAULT
-| < SQATTR : ("alt"|"title"|"content"|"href"|"url"|"price") (" ")*"="(" ")* "'" > : IN_SQ
-| < DQATTR : ("alt"|"title"|"content"|"href"|"url"|"price") (" ")*"="(" ")* "\"" > : IN_DQ
+| < SQATTR : ("alt"|"title"|"content") (" ")*"="(" ")* "'" > : IN_SQ
+| < DQATTR : ("alt"|"title"|"content") (" ")*"="(" ")* "\"" > : IN_DQ
 | < OPENMISC : ~[] >
 }
 
-// The alt tag may contain useful descriptive information.
-
 <IN_SQ> SKIP : {
   < ENDSQ : ("'") > : IN_OPEN_TAG
-| < JSFUNCTIONSQ : "javascript" (" ")* ":" > : IN_JSFUNCTSQ
 | < SQHTTP : <HTTP> >
 | < SQJNK : <HTTPJNKSQ> >
 | < SQDOM : <HTTPDOM> >
@@ -266,14 +253,8 @@ SKIP : {
 | < SQMISC: ~[] >
 }
 
-<IN_JSFUNCTSQ> SKIP : {
-  < EXITJSFUNCTSQ : ")" > : IN_SQ
-| < JSFUNCTSQMISC : ~[] >
-}
-
 <IN_DQ> SKIP : {
   < ENDDQ : ("\"") > : IN_OPEN_TAG
-| < JSFUNCTIONDQ : "javascript" (" ")* ":" > : IN_JSFUNCTDQ
 | < DQHTTP : <HTTP> >
 | < DQJNK : <HTTPJNKDQ> >
 | < DQDOM : <HTTPDOM> >
@@ -287,11 +268,6 @@ SKIP : {
 <IN_DQ> SKIP : {
   < DQLNK : <HTTPLNKDQ> >
 | < DQMISC : ~[] >
-}
-
-<IN_JSFUNCTDQ> SKIP : {
-  < EXITJSFUNCTDQ : ")" > : IN_DQ
-| < JSFUNCTDQMISC : ~[] >
 }
 
 /* ============================================================================================
