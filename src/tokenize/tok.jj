@@ -32,7 +32,6 @@ public class UATokenizer {
 
   public static void run(String[] args) {
     BufferedWriter bw;
-    File[] zDir;
 
     try {
       File inDir = new File(args[0]);
@@ -42,7 +41,6 @@ public class UATokenizer {
       if(!outDir.exists()) {
         outDir.mkdir();
         (new File(args[1]+"/out/")).mkdir();
-        (new File(args[1]+"/text/")).mkdir();
       }
 
       long start = System.currentTimeMillis();
@@ -53,6 +51,7 @@ public class UATokenizer {
         bw.close();
       } else {
 
+        File[] zDir;
         for(File f : files) {
             zDir = f.listFiles();
 
@@ -90,7 +89,7 @@ public class UATokenizer {
 
       bis.close();
   }
-  
+
 }
 PARSER_END(UATokenizer)
 
@@ -98,7 +97,6 @@ TOKEN_MGR_DECLS : {
   String[] tmp;
 
   public String cleanWord(String str) {
-
     str = str.replaceAll("['’\\.\u2019]|(&#(0)?(39|46|x27|14[56]|18[36]);)",""); // Remove all punctuation.
 
     if(str.contains("&")) {
@@ -117,24 +115,6 @@ TOKEN_MGR_DECLS : {
     return str.replaceAll("[@\\.]", " ");
   }
 
-  public String cleanPhone(String str) {
-    String tmp = str;
-    String[] spl = tmp.split("[\\s\\.-]");
-
-    if(spl.length > 2) {
-      tmp = spl[spl.length-3] +""+ spl[spl.length-2] +""+ spl[spl.length-1];
-    } else if(spl.length > 1) {
-      tmp = spl[spl.length-2] +""+ spl[spl.length-1];
-    }
-
-    tmp = tmp.replaceAll("[^0-9]", "");
-    return tmp;
-  }
-
-  public String cleanPrice() {
-    return null; // Still need to figure this out.
-  }
-
 }
 
 /* ============================================================================================
@@ -144,14 +124,6 @@ TOKEN_MGR_DECLS : {
 SKIP : {
   < SPACE : (" "|"\t"|"&#160;")+ >
 | < NEWLINE : ("\r"|"\n")+ >
-| < CSEP : ("'"|"’"|"\u2019"|"â€™"|"&#x27;"|"&#" (["3"-"4"]){2} ";") > // Contraction seperator.
-| < HTTPSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"] >
-| < LINKSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"," "]>
-| < EMAILSYM : ["!","#","$","%","^","&","*","_","+","=","-"] >
-}
-
-SKIP : {
-  < ALPHA : (["a"-"z","A"-"Z"]|["\u00C0"-"\u00FF"]|["\u0100"-"\u017F"]|["\u0100"-"\u017F"]|["\u0180"-"\u024F"]|["\u1E02"-"\u1EF3"]) >
 }
 
 /* ============================================================================================
@@ -232,30 +204,19 @@ SKIP : {
 
 < IN_JSSQ > SKIP : {
   < ENDJSSQ : "'" > : IN_SCRIPT
-| < JSSQDATE : <YMD> | <MDY> | <DMY> >
-| < JSSQIP : <IP> >
 | < JSSQHTTP : <HTTP> >
-| < JSSQPORT : <PORT> >
 | < JSSQJNK : <HTTPJNKSQ> >
-| < JSSQMISC : ~[] >
+| < JSDOMSQ : <HTTPDOM> >
+| < JSEMAILSQ : <EMAIL> >
 }
 < IN_JSSQ > TOKEN : {
-  < JSSQPRICE : <PRICE> | <PRICE2> >
-| < JSDOMSQ : <HTTPDOM> > {
-    matchedToken.image = cleanHTML(matchedToken.image);
-  }
-| < JSEMAILSQ : <EMAIL> > {
-    matchedToken.image = cleanEmail(matchedToken.image);
-}
-| < JSPHONESQ : (<PHONE34> | <PHONE32> | <PHONE58>) > {
-    matchedToken.image = cleanPhone(matchedToken.image);
-  }
-| < JSWORDSQ : <WORD> > {
+  < JSWORDSQ : <WORD> > {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 }
 < IN_JSSQ > SKIP : {
   < JSSQLNK : <HTTPLNKSQ> >
+| < JSSQMISC : ~[] >
 }
 
 /*
@@ -270,30 +231,19 @@ SKIP : {
 
 < IN_JSDQ > SKIP : {
   < ENDJSDQ : "\"" > : IN_SCRIPT
-| < JSDQDATE : <YMD> | <MDY> | <DMY> >
-| < JSDQIP : <IP> >
 | < JSDQHTTP : <HTTP> >
-| < JSDQPORT : <PORT> >
 | < JSDQJNK : <HTTPJNKDQ> >
-| < JSDQMISC : ~[] >
+| < JSDOMDQ : <HTTPDOM> >
+| < JSEMAILDQ : <EMAIL> >
 }
 < IN_JSDQ > TOKEN : {
-  < JSDQPRICE : <PRICE> | <PRICE2> >
-| < JSDOMDQ : <HTTPDOM> > {
-    matchedToken.image = cleanHTML(matchedToken.image);
-  }
-| < JSEMAILDQ : <EMAIL> > {
-    matchedToken.image = cleanEmail(matchedToken.image);
-}
-| < JSPHONEDQ : (<PHONE34> | <PHONE32> | <PHONE58>) > {
-    matchedToken.image = cleanPhone(matchedToken.image);
-  }
-| < JSWORDDQ : <WORD> > {
+  < JSWORDDQ : <WORD> > {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 }
 < IN_JSDQ > SKIP : {
   < JSDQLNK : <HTTPLNKDQ> >
+| < JSDQMISC : ~[] >
 }
 
 /* ============================================================================================
@@ -321,27 +271,19 @@ SKIP : {
 <IN_SQ> SKIP : {
   < ENDSQ : ("'") > : IN_OPEN_TAG
 | < JSFUNCTIONSQ : "javascript" (" ")* ":" > : IN_JSFUNCTSQ
-| < SQDATE : <YMD> | <MDY> | <DMY> >
-| < SQIP : <IP> >
 | < SQHTTP : <HTTP> >
-| < SQPORT : <PORT> >
 | < SQJNK : <HTTPJNKSQ> >
-| < SQMISC: ~[] >
+| < SQDOM : <HTTPDOM> >
+| < SQEMAIL : <EMAIL> >
 }
 <IN_SQ> TOKEN : {
-  < SQPRICE : <PRICE> | <PRICE2> >
-| < SQDOM : <HTTPDOM> > {
-    matchedToken.image = cleanHTML(matchedToken.image);
-  }
-| < SQEMAIL : <EMAIL> > {
-    matchedToken.image = cleanEmail(matchedToken.image);
-}
-| < SQWORD : (<WORD>|<CONT>) > {
+  < SQWORD : (<WORD>|<CONT>) > {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 }
 <IN_SQ> SKIP : {
   < SQLNK : <HTTPLNKSQ> >
+| < SQMISC: ~[] >
 }
 
 <IN_JSFUNCTSQ> SKIP : {
@@ -352,27 +294,19 @@ SKIP : {
 <IN_DQ> SKIP : {
   < ENDDQ : ("\"") > : IN_OPEN_TAG
 | < JSFUNCTIONDQ : "javascript" (" ")* ":" > : IN_JSFUNCTDQ
-| < DQDATE : <YMD> | <MDY> | <DMY> >
-| < DQIP : <IP> >
 | < DQHTTP : <HTTP> >
-| < DQPORT : <PORT> >
 | < DQJNK : <HTTPJNKDQ> >
-| < DQMISC : ~[] >
+| < DQDOM : <HTTPDOM> >
+| < DQEMAIL : <EMAIL> >
 }
 <IN_DQ> TOKEN : {
-  < DQPRICE : <PRICE> | <PRICE2> >
-| < DQDOM : <HTTPDOM> > {
-    matchedToken.image = cleanHTML(matchedToken.image);
-  }
-| < DQEMAIL : <EMAIL> > {
-    matchedToken.image = cleanEmail(matchedToken.image);
-}
-| < DQWORD : (<WORD>|<CONT>) > {
+  < DQWORD : (<WORD>|<CONT>) > {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 }
 <IN_DQ> SKIP : {
   < DQLNK : <HTTPLNKDQ> >
+| < DQMISC : ~[] >
 }
 
 <IN_JSFUNCTDQ> SKIP : {
@@ -392,7 +326,7 @@ SKIP : {
 | < HTTPJNKDQ : ["&","?"] ( (["a"-"z","A"-"Z","0"-"9"]|<HTTPSYM>|"'"){1,2} )+ ( <HTTPDOM> )?  >
 }
 
-TOKEN : {
+SKIP : {
   < HTTPDOM : ( (["a"-"z","A"-"Z","0"-"9"]){1,2} ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z"]){1,2} )+ > {
       matchedToken.image = cleanHTML(matchedToken.image);
   }
@@ -407,76 +341,6 @@ SKIP : {
   ( <HTTPDOM> | "."("html"|"php"|"jsp"|"png"|"jpeg"|"jpg"|"css"|"xml") )? >
 | < HTTPLNKDQ : ("\\")?"/" ( (["a"-"z","A"-"Z","0"-"9"]|<LINKSYM>|"'"){1,2} )+
   ( <HTTPDOM> | "."("html"|"php"|"jsp"|"png"|"jpeg"|"jpg"|"css"|"xml") )? >
-}
-
-/* ============================================================================================
-   DEFINITIONS OF CONSTRUCTIONS LIKE TIME, DATES, PRICES, AND PHONE NUMBERS
- ============================================================================================ */
-
-TOKEN : {
-  < YEAR : ( ["1","2"](["0"-"9"]){3} | (["0","9"]){2} ) >
-}
-SKIP : {
-  < MONTH : (["0"-"1"])?["0"-"9"] > // Reconsider skipping these types of numbers.
-| < DAY : (["0"-"3"])?["0"-"9"] >
-}
-
-SKIP : {
-  < HHMM : (["0"-"9"]){2}":"(["0"-"9"]){2} (["A","a","P","p"]["M","m"])? >
-| < HHMMSS : (["0"-"9"]){2}":"(["0"-"9"]){2}":"(["0"-"9"]){2} (["A","a","P","p"]["M","m"])? >
-| < YEARRANGE : ( (["1","2"]){1}(["0"-"9"]){3} "-" (["1","2"]){1}(["0"-"9"]){3} )  >
-| < DATERANGE : ( (["0"-"9"]){1,2} "/" (["0"-"9"]){2} "-" (["0"-"9"]){1,2} "/" (["0"-"9"]){2} ) >
-| < YMD :  <YEAR> ["-","/","."," "] (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <DAY> >
-| < DMY :  <DAY> ["-","/","."," "] (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <YEAR> >
-| < MDY : (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <DAY> ["-","/","."," ",","] <YEAR> >
-| < IP : ( ( "2"(["0"-"5"]){2}| "1"(["0"-"9"]){2}|(["0"-"9"]){1,2} ) ){1}
-         ( ["."]( "2"(["0"-"5"]){2}| "1"(["0"-"9"]){2}|(["0"-"9"]){1,2})){3}
-         ("/" ( ("08"){1}| "16" | "2"(["4"-"9"]){1}|"32"))? >
-}
-
-TOKEN : {
-  < PRICE : ( ["$","€","¥","£","元","₩","₺","₽","₹","R"]|("&83"(["0"-"9"]){2}";")|("Fr"|"kr"))(" ")*
-            ( (["0"-"9"]){1,3}(",")? )+ ( [".",","](["0"-"9"])+ )? >
-| < PRICE2 : ( (["0"-"9"]){1,3}(",")? )+ ( [".",","](["0"-"9"])+ )?(" ")*
-             ( ("dollar"|"euro"|"yen"|"pound"|"franc"|"krona"|"peso"|"krone"|"won"|"lira"|"ruble"|"rupee"|"read"|"rand"|"bitcoin")("s")? |
-               ("USD"|"EUR"|"JPY"|"GBP"|"AUD"|"CAD"|"CHF"|"CNY"|"SEK"|"NZD"|"MXN"|"SGD"|"HKD"|"NOK"|"KRW"|"TRY"|"RUB"|"INR"|"BRL"|"ZAR")
-             ) >
-} // Need to add unicode & html symb?
-
-/* --------------------------------------------------------------------------------------------
-   Uses a pattern based approach to identify phone numbers. The most popular numbers
-   internationally had groupings of 3-3-3, 3-3-4, 3-2-2, 2-2-2, or 5-8, which were
-   preceded by specific codes.
- -------------------------------------------------------------------------------------------- */
-
-//| < PSEP : (["-"," ","."]|"&#8722;"|"&#46;") > // Phone seperator.
-
-SKIP : {
-  < PHONEFI : ("+"|"&#43;") >
-| < PHONESE : ("(")?(["0"-"9"]){1,4}(")")? >
-| < PHSTASP : ( ( ( <PHONEFI> " " )? <PHONESE> " " )? < PHONESE > " " )? >
-| < PHSTADS : ( ( ( <PHONEFI> "-" )? <PHONESE> "-" )? < PHONESE > "-" )? >
-| < PHSTAPR : ( ( ( <PHONEFI> "." )? <PHONESE> "." )? < PHONESE > "." )? >
-}
-
-TOKEN : {
-  < PHONE34 :
-  < PHSTASP > (["0"-"9"]){3,4} " " (["0"-"9"]){3,4} |
-  < PHSTADS > (["0"-"9"]){3,4} "-" (["0"-"9"]){3,4} |
-  < PHSTAPR > (["0"-"9"]){3,4} "." (["0"-"9"]){3,4} > {
-      matchedToken.image = cleanPhone(matchedToken.image);
-  }
-| < PHONE32 :
-  < PHSTASP > (["0"-"9"]){2,3} " " (["0"-"9"]){2} " " (["0"-"9"]){2} |
-  < PHSTADS > (["0"-"9"]){2,3} "-" (["0"-"9"]){2} "-" (["0"-"9"]){2} |
-  < PHSTADS > (["0"-"9"]){2,3} "." (["0"-"9"]){2} "." (["0"-"9"]){2} > {
-      matchedToken.image = cleanPhone(matchedToken.image);
-  }
-| < PHONE58 : ( < PHONEFI > (["0"-"9"]){1,2} " " )? ("(")?(["0"-"9"]){2,5}(")")? " " (["0"-"9"]){5,8} |
-  ( < PHONEFI > (["0"-"9"]){1,2} "-" )? ("(")?(["0"-"9"]){2,5}(")")? "-" (["0"-"9"]){5,8} |
-  ( < PHONEFI > (["0"-"9"]){1,2} "." )? ("(")?(["0"-"9"]){2,5}(")")? "." (["0"-"9"]){5,8} > {
-      matchedToken.image = cleanPhone(matchedToken.image);
-  }
 }
 
 /* ============================================================================================
@@ -498,6 +362,10 @@ TOKEN : {
    The following identifies basic words / numbers.
  -------------------------------------------------------------------------------------------- */
 
+ TOKEN : {
+   < ALPHA : (["a"-"z","A"-"Z"]|["\u00C0"-"\u00FF"]|["\u0100"-"\u017F"]|["\u0100"-"\u017F"]|["\u0180"-"\u024F"]|["\u1E02"-"\u1EF3"]) >
+ }
+
 TOKEN : {
   < BREV : ( < ALPHA > ( "&#46;" | "&#046;" | ["0"-"9","."] ) )+ < ALPHA > ( "&#46;" | "&#046;" | ["0"-"9","."] ) > {
     matchedToken.image = cleanWord(matchedToken.image);
@@ -506,8 +374,12 @@ TOKEN : {
     matchedToken.image = cleanWord(matchedToken.image);
   }
 | < WORD : < ALPHA > ( < ALPHA > )+ >
-| < SIGNUM : (<NUMBER>){2,4} >
 }
+
+/*
+TOKEN : {
+  < SIGNUM : (["0"-"9"]){2,4} >
+}*/
 
 SKIP : {
   < ENGSYMB : "&" ( "#" (["0"-"9"]){1} ( (["0"-"9"]){1} | ((["0"-"5"]){1}|(["7"-"9"]){1}) (["0"-"9"]){1} )
@@ -515,9 +387,12 @@ SKIP : {
       ("acute"|"cedil"|"circ"|"grave"|"lig"|"slash"|"tilde"|"uml"|"ring"|["f","m"])
     | ("middot"|"eth"|"ETH"|"thorn"|"THORN") ) ";" >
 | < SYMBOL : "&" ("#")?(["a"-"z","0"-"9"]){2,12} ";" >
+| < CSEP : ("'"|"’"|"\u2019"|"â€™"|"&#x27;"|"&#" (["3"-"4"]){2} ";") > // Contraction seperator.
+| < HTTPSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"] >
+| < LINKSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"," "]>
+| < EMAILSYM : ["!","#","$","%","^","&","*","_","+","=","-"] >
 }
 
 SKIP : {
-  < NUMBER : (["0"-"9"])+>
-| < MISC: ~[] >
+  < MISC: ~[] >
 }
