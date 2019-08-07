@@ -1,112 +1,630 @@
 
 /**
  * JavaCC template file created by SF JavaCC plugin 1.5.28+ wizard for JavaCC 1.5.0+
- */
-options{  static = false;}PARSER_BEGIN(Tokenizer)
-package tokenize;
-import java.io.*;
+ */
 
-public class Tokenizer {  public static void main(String args []) throws ParseException {
-	if(args == null || args.length == 0) {
-	  	args = new String[2];
-		args[0] = "input/tokenize";
-		args[1] = "output/tokenize";
-	}
+options {
+  static = false;
+  LOOKAHEAD=1;
+}
 
-	try {
+PARSER_BEGIN(UATokenizer)
+import java.io.IOException;
+import java.io.FileReader;
+import java.io.BufferedInputStream;
+import java.io.BufferedReader;
+import java.io.FileInputStream;
+import java.io.BufferedWriter;
+import java.io.FileWriter;
+import java.io.File;
+import java.io.InputStreamReader;
 
-		BufferedInputStream bis; 
-		BufferedWriter bw;
-		Tokenizer tok;
+public class UATokenizer {
 
-		File input = new File(args[0]);
-		File output = new File(args[1]);
-
-		output.mkdirs();
-		
-		File[] files = input.listFiles();
-
-		// For each file, tokenize it and write the tokens to a new directory.
-
-		for(File f : files) {
-
-			bis = new BufferedInputStream(new FileInputStream(f));
-			tok = new Tokenizer(bis);
-			bw = new BufferedWriter(new FileWriter(output.getPath()+"/"+f.getName()+".out"));
-
-			process(bw,tok); // Process the file with a tokenizer.
- 
-			bw.close();
-			bis.close();
-
-		}
-	
-
-	} catch(IOException ex) {
-		ex.printStackTrace();
-		System.exit(1);
-	}
-      }
-
-  public static void process(BufferedWriter bw, Tokenizer tok) throws IOException {
-
-	Token t = tok.getNextToken();
-
-	while( t.kind != Tokenizer.EOF ) {
-
-		bw.write(String.format("%-24s %-12s\n", t.image.toLowerCase(), Tokenizer.tokenImage[t.kind] )); // Write the token to a file.
-		t = tok.getNextToken();
-
-	}
-
+  public static void main(String args[]) throws ParseException {
+    if(args == null) {
+      args = new String[2];
+      args[0] = "./input";
+      args[1] = "./output";
+    }
+    run(args);
   }
-  }PARSER_END(Tokenizer)
+
+  public static BufferedWriter[] getWriters(String path) {
+    BufferedWriter[] bw = null;
+
+    try {
+      String[] filenames = {"other.txt","email.txt","domain.txt","price.txt","word.txt","phone.txt"};
+      bw = new BufferedWriter[filenames.length];
+
+      for (int i = 0; i < filenames.length; i++) {
+        bw[i] = new BufferedWriter(new FileWriter(path+"/text/"+filenames[i]));
+      }
+
+    } catch(IOException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+    return bw;
+  }
+
+  public static void closeWriters(BufferedWriter[] bw) {
+    try {
+      for(BufferedWriter b : bw) {
+        b.close();
+      }
+    } catch(IOException ex) {
+      System.exit(1);
+    }
+  }
+
+  public static void run(String[] args) {
+    BufferedWriter bw2;
+    File[] zDir;
+    int[] count = new int[7];
+
+    try {
+      File inDir = new File(args[0]);
+      File[] files = inDir.listFiles();
+      File outDir = new File(args[1]);
+
+      if(!outDir.exists()) {
+        outDir.mkdir();
+        (new File(args[1]+"/out/")).mkdir();
+        (new File(args[1]+"/text/")).mkdir();
+      }
+
+      BufferedWriter[] bw = getWriters(outDir.getPath());
+      long start = System.currentTimeMillis();
+
+      if(files == null) {
+        bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+inDir.getName()+".out"));
+        processFile(bw,bw2,inDir,count); // Process a single file.
+        bw2.close();
+      } else {
+
+        for(File f : files) {
+            zDir = f.listFiles();
+
+            if(zDir != null) {
+
+                for(File z : zDir) {
+                    bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+z.getName()+".out"));
+                    processFile(bw,bw2,z,count); // Process a files in a subdirectory.
+                    bw2.close();
+                }
+
+            } else {
+                bw2 = new BufferedWriter(new FileWriter(args[1]+"/out/"+f.getName()+".out"));
+                processFile(bw,bw2,f,count); // Process multiple files.
+                bw2.close();
+            }
+        }
+      }
+      closeWriters(bw);
+      printResults(count,start);
+
+    } catch(IOException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+  }
+
+  public static void processFile(BufferedWriter[] bw, BufferedWriter bw2, File f, int[] count) throws IOException {
+    BufferedReader bis = new BufferedReader(new InputStreamReader(new FileInputStream(f),"UTF-8"));
+    UATokenizer parser = new UATokenizer(bis);
+    Token t;
+
+    do {
+      t = parser.getNextToken();
+      recordToken(bw,bw2,t,count);
+
+    } while(t.kind != UATokenizerConstants.EOF);
+
+      bis.close();
+      count[1]++;
+  }
+
+  public static void recordToken(BufferedWriter[] bw, BufferedWriter bw2, Token t, int[] count) {
+    try {
+      String type = UATokenizer.tokenImage[t.kind];
+      String fmt = t.image.toLowerCase();
+      //String fmt = t.image.toLowerCase()+" "+type;
+
+      if(t.image.length() > 2) {
+
+        bw2.write(fmt+"\n");
+        count[0]++; // Count number of tokens processed.
+
+        if(type.equals("<EMAIL>")    ||type.equals("<DQEMAIL>")   ||type.equals("<SQEMAIL>")||
+           type.equals("<JSEMAILSQ>")||type.equals("<JSEMAILDQ>")) {
+
+            bw[1].write(fmt+"\n");
+            count[2]++;
+
+        } else if(type.equals("<HTTPDOM>")||type.equals("<SQDOM>")   ||type.equals("<DQDOM>")||
+                  type.equals("<JSDOMSQ>")||type.equals("<JSDOMDQ>")) {
+
+            bw[2].write(fmt+"\n");
+            count[3]++;
+
+        } else if(type.equals("<PRICE>")  ||type.equals("<PRICE2>")    ||type.equals("<SQPRICE>")  ||
+                  type.equals("<DQPRICE>")||type.equals("<JSSQPRICE>") ||type.equals("<JSDQPRICE>")) {
+
+            bw[3].write(fmt+"\n");
+            count[4]++;
+
+        } else if(type.equals("<WORD>")    ||type.equals("<CONT>")    ||type.equals("<CROWDED>")  ||
+                  type.equals("<CROWDED2>")||type.equals("<BREV>")    ||type.equals("<SQWORD>")   ||
+                  type.equals("<DQWORD>")  ||type.equals("<JSWORDSQ>")||type.equals("<JSWORDDQ>")) {
+
+            /*
+            if(fmt.length() > 8) {
+                fmt = fmt.substring(0,9); // Reduce the size of the word to a length of 9.
+            }*/
+
+            bw[4].write(fmt+"\n");
+            count[5]++;
+
+        } else if(type.equals("<PHONE34>")  ||type.equals("<PHONE32>")   || type.equals("<PHONE58>")||
+                  type.equals("<JSPHONESQ>")||type.equals("<JSPHONEDQ>")) {
+
+            bw[5].write(fmt+"\n");
+            count[6]++;
+
+        }  else {
+            bw[0].write(fmt+"\n"); // Write remaining tokens to a separate file.
+        }
+      }
+
+    } catch(IOException ex) {
+      System.exit(1);
+    }
+  }
+
+  public static void printResults(int[] count, long start) {
+    try {
+      BufferedWriter bw = new BufferedWriter(new FileWriter("summary.txt"));
+      String[] label = {"Total tokens: ","Files processed: ","Emails found: ","Domains found: ","Prices found: ","Words found: ","Phone #s found:"};
+
+      bw.write("======= Project Gengar Tokenization Summary =======\n");
+      for(int i = 0; i < label.length; i++) {
+        bw.write(String.format("%-25s %-50d\n",label[i],count[i]));
+      }
+      bw.write(String.format("%-25s %-50.2f\n","Total runtime (seconds): ",(System.currentTimeMillis()-start)/1000.0));
+      bw.close();
+    } catch(IOException ex) {
+      System.exit(1);
+    }
+  }
+}
+PARSER_END(UATokenizer)
+
+TOKEN_MGR_DECLS : {
+  String[] tmp;
+
+  public String cleanWord(String str) {
+
+    str = str.replaceAll("['’\\.\u2019]|(&#(0)?(39|46|x27|14[56]|18[36]);)",""); // Remove all punctuation.
+
+    if(str.contains("&")) {
+      str = str.replaceAll("&([aAeEiIoOuU]([a-z]){3,6}|#[1234]([0-9]){2});","?"); // Substitute accented characters with a '?'.
+      str = str.replaceAll("[&]([#])?([0x])? ( ([3-9]){2} | amp | minus | 8722 | 2212 ) [;]"," "); // Replace certain non-punctuation with a space.
+    }
+
+    return str;
+  }
+
+  public String cleanHTML(String str) {
+    return str.replaceAll("[\\.]", " ");
+  }
+
+  public String cleanEmail(String str) {
+    return str.replaceAll("[@\\.]", " ");
+  }
+
+  public String cleanPhone(String str) {
+    String tmp = str;
+    String[] spl = tmp.split("[\\s\\.-]");
+
+    if(spl.length > 2) {
+      tmp = spl[spl.length-3] +""+ spl[spl.length-2] +""+ spl[spl.length-1];
+    } else if(spl.length > 1) {
+      tmp = spl[spl.length-2] +""+ spl[spl.length-1];
+    }
+
+    tmp = tmp.replaceAll("[^0-9]", "");
+    return tmp;
+  }
+
+  public String cleanPrice() {
+    return null; // Still need to figure this out.
+  }
+
+}
+
+/* ============================================================================================
+   DEFINE SYMBOLS THAT MAY BE SKIPPED OR USED LATER.
+ ============================================================================================ */
+
 SKIP : {
-  	< SCR_TAG : "<" (" ")* ("script"|"SCRIPT") (" ")* > : IN_SCRIPT
-| 	< TAG : "<" > : IN_TAG
+  < SPACE : (" "|"\t"|"&#160;")+ >
+| < NEWLINE : ("\r"|"\n")+ >
+| < CSEP : ("'"|"’"|"\u2019"|"â€™"|"&#x27;"|"&#" (["3"-"4"]){2} ";") > // Contraction seperator.
+| < HTTPSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"] >
+| < LINKSYM : [",","-","_",":",";","+","^","%","#","=","@","~","[","]","$","(",")","*"," "]>
+| < EMAILSYM : ["!","#","$","%","^","&","*","_","+","=","-"] >
 }
-
-
-< IN_SCRIPT > : {
-	<  >
-}
-
-/* In tag, general. */
-
-< IN_TAG > SKIP : {
-	< TAG_WORD : < WORD > >	
-}
-< IN_TAG > SKIP : {
-	< TAG_EXIT : ">" > : DEFAULT
-|   < DQTAG_ATTR : "\"" > : IN_DQATTR
-|   < SQTAG_ATTR : "'" > : IN_SQATTR
-|   < TAG_MISC: ~[] > 
-} 
-
-< IN_DQATTR > TOKEN : {
-	< DQATTR_WORD : < WORD > >	
-}
-< IN_DQATTR > SKIP : {
-	< DQATTR_EXIT : "\"" > : IN_TAG
-|   < DQATTR_MISC: ~[] >
-}
-
-< IN_SQATTR > TOKEN : {
-	< SQATTR_WORD : < WORD > >	
-}
-< IN_SQATTR > SKIP : {
-	< SQATTR_EXIT : "'" > : IN_TAG
-|   < SQATTR_MISC: ~[] >
-}
-TOKEN : {
-	< CHAR : ["a"-"z","A"-"Z"] >|   < WORD : (< CHAR >)+ >
-|   < NUMBER : (["0"-"9"])+>}
 
 SKIP : {
-  " "
-| "\r"
-| "\t"
-| "\n"
-| < MISC: ~[] > // If you place this above token, it won't capture <CHAR>.
-} 
+  < ALPHA : (["a"-"z","A"-"Z"] | ("\\u00"["4"-"7"]["0"-"9","A"-"F"]) | ("\\u00"["A"-"F"]["0"-"9","A"-"F"]) ) >
+}
 
+/* ============================================================================================
+   SKIP TAGS, OR PORTIONS OF TAGS THAT MAY NOT CONTAIN USEFUL INFORMATION.
+ ============================================================================================ */
+
+// Tags we'll enter and either tokenize, or skip altogther.
+
+SKIP : {
+  < SCRIPTTAG2 :  "<" (" ")*("script"|"SCRIPT")(" ")* > : IN_SCRIPT
+| < SPTAG : "<" (" ")*("style"|"STYLE"|"button"|"BUTTON"|"time"|"TIME"|"noscript"|"NOSCRIPT")(" ")* > : IN_SP_TAG
+| < PRETAG :  "<" (" ")*("pre"|"PRE"|"code"|"CODE")(" ")* > : IN_CODE_TAG
+| < CMTTAG : "<" (" ")*"!"(" ")* > : IN_CMT_TAG
+| < PHP : "<" (" ")*"?"(" ")*"php"(" ")* > : IN_PHP
+}
+
+< IN_SP_TAG > SKIP : {
+  < ENDATAG : "<" (" ")*"/"(" ")* ("style"|"STYLE"|"button"|"BUTTON"|"time"|"TIME"|"noscript"|"NOSCRIPT") > : DEFAULT
+| < SPCMT : "/*" > : SP_CMT
+| < SPTAGMISC : ~[] >
+}
+< SP_CMT > SKIP : {
+  < ENDSPCMT : "*/" > : IN_SP_TAG
+| < SPCMTMISC : ~[] >
+}
+< IN_CMT_TAG > SKIP : {
+  < ENDCMTTAG : ("-")?(" ")*">" > : DEFAULT
+| < CMTMISC : ~[] >
+}
+
+< IN_CODE_TAG > SKIP : {
+  < ENDPRETAG : "<" (" ")*"/"(" ")* ("pre"|"PRE"|"code"|"CODE") > : DEFAULT
+| < PREMISC : ~[] >
+}
+
+< IN_PHP > SKIP : {
+  < ENDPHP : "?"(" ")*">" > : DEFAULT
+| < PHPCMT : "/*" > : PHP_CMT
+| < PHPMISC : ~[] >
+}
+< PHP_CMT > SKIP : {
+  < ENDPHPCMT : "*/" > : IN_PHP
+| < PHPCMTMISC : ~[] >
+}
+
+/* --------------------------------------------------------------------------------------------
+   When we enter a script tag, use different tokenization techniques depending on the type.
+ -------------------------------------------------------------------------------------------- */
+
+// "header", "company"
+
+< IN_SCRIPT > SKIP : {
+  < ENDJS : "<" (" ")*"/"(" ")* ("script"|"SCRIPT") > : DEFAULT
+| < SCRIPTCMT : "/*" > : IN_SC_CMT
+| < JSSQ :
+(
+  "name"|"url"|"title"|"desc"("ription")?|"text"|"caption"|"category"|"href"|"price"
+  |"keyword"("s")?|"brand"|"domain"|"email"|"alt"|"vendor"|("tele")?"phone"
+  |"alias"|"headline"|"tag"|"subtitle"|"excerpt"|"company"|"address"
+) (" ")*"'" (" ")*":" (" ")*"'" > : IN_JSSQ
+| < JSDQ :
+(
+  "name"|"url"|"title"|"desc"("ription")?|"text"|"caption"|"category"|"href"|"price"
+  |"keyword"("s")?|"brand"|"domain"|"email"|"alt"|"vendor"|("tele")?"phone"
+  |"alias"|"headline"|"tag"|"subtitle"|"excerpt"|"company"|"address"
+) (" ")*"\"" (" ")*":" (" ")*"\"" > : IN_JSDQ
+| < SCRIPTTAGMISC : ~[] >
+}
+
+< IN_SC_CMT > SKIP : {
+  < ENDSCCMT : "*/" > : IN_SCRIPT
+| < SCCMTMISC : ~[] >
+}
+
+/* --------------------------------------------------------------------------------------------
+   Collect the information within quotation marks.
+ -------------------------------------------------------------------------------------------- */
+
+< IN_JSSQ > SKIP : {
+  < ENDJSSQ : "'" > : IN_SCRIPT
+| < JSSQDATE : <YMD> | <MDY> | <DMY> >
+| < JSSQIP : <IP> >
+| < JSSQHTTP : <HTTP> >
+| < JSSQPORT : <PORT> >
+| < JSSQJNK : <HTTPJNKSQ> >
+| < JSSQMISC : ~[] >
+}
+< IN_JSSQ > TOKEN : {
+  < JSSQPRICE : <PRICE> | <PRICE2> >
+| < JSDOMSQ : <HTTPDOM> > {
+    matchedToken.image = cleanHTML(matchedToken.image);
+  }
+| < JSEMAILSQ : <EMAIL> > {
+    matchedToken.image = cleanEmail(matchedToken.image);
+}
+| < JSPHONESQ : (<PHONE34> | <PHONE32> | <PHONE58>) > {
+    matchedToken.image = cleanPhone(matchedToken.image);
+  }
+| < JSWORDSQ : <WORD> > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+}
+< IN_JSSQ > SKIP : {
+  < JSSQLNK : <HTTPLNKSQ> >
+}
+
+/*
+| < JSDQOT : <OPENTAG> > : IN_JSDQOPEN_TAG
+| < JSDQCT : <CLOSETAG> >
+
+< IN_JSDQOPEN_TAG > SKIP : {
+  < ENDJSDQOPTAG : (">") > : IN_JSDQ
+| < JSDQOPENMISC : ~[] >
+}
+*/
+
+< IN_JSDQ > SKIP : {
+  < ENDJSDQ : "\"" > : IN_SCRIPT
+| < JSDQDATE : <YMD> | <MDY> | <DMY> >
+| < JSDQIP : <IP> >
+| < JSDQHTTP : <HTTP> >
+| < JSDQPORT : <PORT> >
+| < JSDQJNK : <HTTPJNKDQ> >
+| < JSDQMISC : ~[] >
+}
+< IN_JSDQ > TOKEN : {
+  < JSDQPRICE : <PRICE> | <PRICE2> >
+| < JSDOMDQ : <HTTPDOM> > {
+    matchedToken.image = cleanHTML(matchedToken.image);
+  }
+| < JSEMAILDQ : <EMAIL> > {
+    matchedToken.image = cleanEmail(matchedToken.image);
+}
+| < JSPHONEDQ : (<PHONE34> | <PHONE32> | <PHONE58>) > {
+    matchedToken.image = cleanPhone(matchedToken.image);
+  }
+| < JSWORDDQ : <WORD> > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+}
+< IN_JSDQ > SKIP : {
+  < JSDQLNK : <HTTPLNKDQ> >
+}
+
+/* ============================================================================================
+   Skip the contents of HTML attributes that may contain unhelpful information, such
+   as style definitions.
+ ============================================================================================ */
+
+// text, category, label
+
+SKIP : {
+  < OPENTAG : "<" (" ")*( (["a"-"z","A"-"Z","0"-"9","-"])+ )(" ")* > : IN_OPEN_TAG
+| < CLOSETAG : "<" (" ")* ( "/"(" ")*(["a"-"z","A"-"Z","0"-"9","-"])+
+               | (["a"-"z","A"-"Z","0"-"9","-"])+ (" ")*"/" ) (" ")* >
+}
+
+< IN_OPEN_TAG > SKIP : {
+  < ENDOPTAG : (">") > : DEFAULT
+| < SQATTR : ("alt"|"title"|"content"|"href"|"url"|"price") (" ")*"="(" ")* "'" > : IN_SQ
+| < DQATTR : ("alt"|"title"|"content"|"href"|"url"|"price") (" ")*"="(" ")* "\"" > : IN_DQ
+| < OPENMISC : ~[] >
+}
+
+// The alt tag may contain useful descriptive information.
+
+<IN_SQ> SKIP : {
+  < ENDSQ : ("'") > : IN_OPEN_TAG
+| < JSFUNCTIONSQ : "javascript" (" ")* ":" > : IN_JSFUNCTSQ
+| < SQDATE : <YMD> | <MDY> | <DMY> >
+| < SQIP : <IP> >
+| < SQHTTP : <HTTP> >
+| < SQPORT : <PORT> >
+| < SQJNK : <HTTPJNKSQ> >
+| < SQMISC: ~[] >
+}
+<IN_SQ> TOKEN : {
+  < SQPRICE : <PRICE> | <PRICE2> >
+| < SQDOM : <HTTPDOM> > {
+    matchedToken.image = cleanHTML(matchedToken.image);
+  }
+| < SQEMAIL : <EMAIL> > {
+    matchedToken.image = cleanEmail(matchedToken.image);
+}
+| < SQWORD : (<WORD>|<CONT>) > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+}
+<IN_SQ> SKIP : {
+  < SQLNK : <HTTPLNKSQ> >
+}
+
+<IN_JSFUNCTSQ> SKIP : {
+  < EXITJSFUNCTSQ : ")" > : IN_SQ
+| < JSFUNCTSQMISC : ~[] >
+}
+
+<IN_DQ> SKIP : {
+  < ENDDQ : ("\"") > : IN_OPEN_TAG
+| < JSFUNCTIONDQ : "javascript" (" ")* ":" > : IN_JSFUNCTDQ
+| < DQDATE : <YMD> | <MDY> | <DMY> >
+| < DQIP : <IP> >
+| < DQHTTP : <HTTP> >
+| < DQPORT : <PORT> >
+| < DQJNK : <HTTPJNKDQ> >
+| < DQMISC : ~[] >
+}
+<IN_DQ> TOKEN : {
+  < DQPRICE : <PRICE> | <PRICE2> >
+| < DQDOM : <HTTPDOM> > {
+    matchedToken.image = cleanHTML(matchedToken.image);
+  }
+| < DQEMAIL : <EMAIL> > {
+    matchedToken.image = cleanEmail(matchedToken.image);
+}
+| < DQWORD : (<WORD>|<CONT>) > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+}
+<IN_DQ> SKIP : {
+  < DQLNK : <HTTPLNKDQ> >
+}
+
+<IN_JSFUNCTDQ> SKIP : {
+  < EXITJSFUNCTDQ : ")" > : IN_DQ
+| < JSFUNCTDQMISC : ~[] >
+}
+
+/* ============================================================================================
+   Skip parts of the url that may contribute more garbage than relevant information.
+   Only retain HTML domains, parts of the url, email addresses that seem useful.
+ ============================================================================================ */
+
+SKIP : {
+  < HTTP : (["a"-"z"])+"://" >
+| < PORT : ":"(["0"-"9"]){4,8} >
+| < HTTPJNKSQ : ["&","?"] ( (["a"-"z","A"-"Z","0"-"9"]|<HTTPSYM>|"\""){1,2} )+ ( <HTTPDOM> )?  >
+| < HTTPJNKDQ : ["&","?"] ( (["a"-"z","A"-"Z","0"-"9"]|<HTTPSYM>|"'"){1,2} )+ ( <HTTPDOM> )?  >
+}
+
+TOKEN : {
+  < HTTPDOM : ( (["a"-"z","A"-"Z","0"-"9"]){1,2} ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z"]){1,2} )+ > {
+      matchedToken.image = cleanHTML(matchedToken.image);
+  }
+| < EMAIL : ( (["a"-"z","A"-"Z","0"-"9"]|<EMAILSYM>){1,2} )+ ( (["a"-"z","A"-"Z","0"-"9","="]|<EMAILSYM>){1,2} )?
+            "@" ( ( (["a"-"z","A"-"Z","0"-"9","-"]){1,2} )+(".") )+ ( (["a"-"z","A"-"Z","-"]){1,2} )+ > {
+      matchedToken.image = cleanEmail(matchedToken.image);
+  }
+}
+
+SKIP : {
+  < HTTPLNKSQ : ("\\")?"/" ( (["a"-"z","A"-"Z","0"-"9"]|<LINKSYM>|"\""){1,2} )+
+  ( <HTTPDOM> | "."("html"|"php"|"jsp"|"png"|"jpeg"|"jpg"|"css"|"xml") )? >
+| < HTTPLNKDQ : ("\\")?"/" ( (["a"-"z","A"-"Z","0"-"9"]|<LINKSYM>|"'"){1,2} )+
+  ( <HTTPDOM> | "."("html"|"php"|"jsp"|"png"|"jpeg"|"jpg"|"css"|"xml") )? >
+}
+
+/* ============================================================================================
+   DEFINITIONS OF CONSTRUCTIONS LIKE TIME, DATES, PRICES, AND PHONE NUMBERS
+ ============================================================================================ */
+
+TOKEN : {
+  < YEAR : ( ["1","2"](["0"-"9"]){3} | (["0","9"]){2} ) >
+}
+SKIP : {
+  < MONTH : (["0"-"1"])?["0"-"9"] > // Reconsider skipping these types of numbers.
+| < DAY : (["0"-"3"])?["0"-"9"] >
+}
+
+SKIP : {
+  < HHMM : (["0"-"9"]){2}":"(["0"-"9"]){2} (["A","a","P","p"]["M","m"])? >
+| < HHMMSS : (["0"-"9"]){2}":"(["0"-"9"]){2}":"(["0"-"9"]){2} (["A","a","P","p"]["M","m"])? >
+| < YEARRANGE : ( (["1","2"]){1}(["0"-"9"]){3} "-" (["1","2"]){1}(["0"-"9"]){3} )  >
+| < DATERANGE : ( (["0"-"9"]){1,2} "/" (["0"-"9"]){2} "-" (["0"-"9"]){1,2} "/" (["0"-"9"]){2} ) >
+| < YMD :  <YEAR> ["-","/","."," "] (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <DAY> >
+| < DMY :  <DAY> ["-","/","."," "] (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <YEAR> >
+| < MDY : (<MONTH> | (["a"-"z","A"-"Z"]){3,10}) ["-","/","."," "] <DAY> ["-","/","."," ",","] <YEAR> >
+| < IP : ( ( "2"(["0"-"5"]){2}| "1"(["0"-"9"]){2}|(["0"-"9"]){1,2} ) ){1}
+         ( ["."]( "2"(["0"-"5"]){2}| "1"(["0"-"9"]){2}|(["0"-"9"]){1,2})){3}
+         ("/" ( ("08"){1}| "16" | "2"(["4"-"9"]){1}|"32"))? >
+}
+
+TOKEN : {
+  < PRICE : ( ["$","€","¥","£","元","₩","₺","₽","₹","R"]|("&83"(["0"-"9"]){2}";")|("Fr"|"kr"))(" ")*
+            ( (["0"-"9"]){1,3}(",")? )+ ( [".",","](["0"-"9"])+ )? >
+| < PRICE2 : ( (["0"-"9"]){1,3}(",")? )+ ( [".",","](["0"-"9"])+ )?(" ")*
+             ( ("dollar"|"euro"|"yen"|"pound"|"franc"|"krona"|"peso"|"krone"|"won"|"lira"|"ruble"|"rupee"|"read"|"rand"|"bitcoin")("s")? |
+               ("USD"|"EUR"|"JPY"|"GBP"|"AUD"|"CAD"|"CHF"|"CNY"|"SEK"|"NZD"|"MXN"|"SGD"|"HKD"|"NOK"|"KRW"|"TRY"|"RUB"|"INR"|"BRL"|"ZAR")
+             ) >
+} // Need to add unicode & html symb?
+
+/* --------------------------------------------------------------------------------------------
+   Uses a pattern based approach to identify phone numbers. The most popular numbers
+   internationally had groupings of 3-3-3, 3-3-4, 3-2-2, 2-2-2, or 5-8, which were
+   preceded by specific codes.
+ -------------------------------------------------------------------------------------------- */
+
+//| < PSEP : (["-"," ","."]|"&#8722;"|"&#46;") > // Phone seperator.
+
+SKIP : {
+  < PHONEFI : ("+"|"&#43;") >
+| < PHONESE : ("(")?(["0"-"9"]){1,4}(")")? >
+| < PHSTASP : ( ( ( <PHONEFI> " " )? <PHONESE> " " )? < PHONESE > " " )? >
+| < PHSTADS : ( ( ( <PHONEFI> "-" )? <PHONESE> "-" )? < PHONESE > "-" )? >
+| < PHSTAPR : ( ( ( <PHONEFI> "." )? <PHONESE> "." )? < PHONESE > "." )? >
+}
+
+TOKEN : {
+  < PHONE34 :
+  < PHSTASP > (["0"-"9"]){3,4} " " (["0"-"9"]){3,4} |
+  < PHSTADS > (["0"-"9"]){3,4} "-" (["0"-"9"]){3,4} |
+  < PHSTAPR > (["0"-"9"]){3,4} "." (["0"-"9"]){3,4} > {
+      matchedToken.image = cleanPhone(matchedToken.image);
+  }
+| < PHONE32 :
+  < PHSTASP > (["0"-"9"]){2,3} " " (["0"-"9"]){2} " " (["0"-"9"]){2} |
+  < PHSTADS > (["0"-"9"]){2,3} "-" (["0"-"9"]){2} "-" (["0"-"9"]){2} |
+  < PHSTADS > (["0"-"9"]){2,3} "." (["0"-"9"]){2} "." (["0"-"9"]){2} > {
+      matchedToken.image = cleanPhone(matchedToken.image);
+  }
+| < PHONE58 : ( < PHONEFI > (["0"-"9"]){1,2} " " )? ("(")?(["0"-"9"]){2,5}(")")? " " (["0"-"9"]){5,8} |
+  ( < PHONEFI > (["0"-"9"]){1,2} "-" )? ("(")?(["0"-"9"]){2,5}(")")? "-" (["0"-"9"]){5,8} |
+  ( < PHONEFI > (["0"-"9"]){1,2} "." )? ("(")?(["0"-"9"]){2,5}(")")? "." (["0"-"9"]){5,8} > {
+      matchedToken.image = cleanPhone(matchedToken.image);
+  }
+}
+
+/* ============================================================================================
+   REGEX USED TO COLLECT WORDS.
+ ============================================================================================ */
+
+TOKEN : {
+  < CROWDED : ">" ( <WORD> | <CONT> ) > {
+    matchedToken.image = image.substring(image.indexOf(">")+1,image.length());
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+| < CROWDED2 : ( <WORD> | <CONT> ) < CLOSETAG > > {
+    matchedToken.image = image.substring(0,image.indexOf("<"));
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+}
+
+/* --------------------------------------------------------------------------------------------
+   The following identifies basic words / numbers.
+ -------------------------------------------------------------------------------------------- */
+
+TOKEN : {
+  < BREV : ( < ALPHA > ( "&#46;" | "&#046;" | ["0"-"9","."] ) )+ < ALPHA > ( "&#46;" | "&#046;" | ["0"-"9","."] ) > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+| < CONT : ( < ALPHA > )+ ( < ENGSYMB > | < CSEP > | "-" ) ( < ALPHA > )+ > {
+    matchedToken.image = cleanWord(matchedToken.image);
+  }
+| < WORD : < ALPHA > ( < ALPHA > )+ >
+
+| < SIGNUM : (<NUMBER>){2,4} >
+}
+
+SKIP : {
+  < ENGSYMB : "&" ( "#" (["0"-"9"]){1} ( (["0"-"9"]){1} | ((["0"-"5"]){1}|(["7"-"9"]){1}) (["0"-"9"]){1} )
+    | (["a","A","e","E","i","I","o","O","u","U","n","N"]|"sz"|"ord")
+      ("acute"|"cedil"|"circ"|"grave"|"lig"|"slash"|"tilde"|"uml"|"ring"|["f","m"])
+    | ("middot"|"eth"|"ETH"|"thorn"|"THORN") ) ";" >
+| < SYMBOL : "&" ("#")?(["a"-"z","0"-"9"]){2,12} ";" >
+}
+
+SKIP : {
+  < NUMBER : (["0"-"9"])+>
+| < MISC: ~[] >
+}
