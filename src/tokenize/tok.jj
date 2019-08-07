@@ -40,31 +40,38 @@ public class UATokenizer {
 
       if(!outDir.exists()) {
         outDir.mkdir();
-        (new File(args[1]+"/out/")).mkdir();
+        (new File(args[1])).mkdir();
       }
 
       long start = System.currentTimeMillis();
 
       if(files == null) {
-        bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+inDir.getName()+".out"));
+        bw = new BufferedWriter(new FileWriter(outDir.getName()+"/"+inDir.getName()+".out"));
         processFile(bw,inDir); // Process a single file.
         bw.close();
       } else {
 
         File[] zDir;
+        File tmp;
         for(File f : files) {
             zDir = f.listFiles();
 
             if(zDir != null) {
 
                 for(File z : zDir) {
-                    bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+z.getName()+".out"));
+                    tmp =  new File( outDir.getName()+"/"+f.getName() );
+                    tmp.mkdir();
+                    
+                    bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+z.getName()+".out"));
                     processFile(bw,z); // Process a files in a subdirectory.
                     bw.close();
                 }
 
             } else {
-                bw = new BufferedWriter(new FileWriter(args[1]+"/out/"+f.getName()+".out"));
+                tmp =  new File( outDir.getName()+"/"+inDir.getName() );
+                tmp.mkdir();
+
+                bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+f.getName()+".out"));
                 processFile(bw,f); // Process multiple files.
                 bw.close();
             }
