@@ -52,6 +52,7 @@ public class UAContext {
 		}
 		
 		return true;
+		
 	}
 	
 	private int fillGlobalHashTableGetDistictWords(File[] files, BufferedWriter logs) throws IOException {
