@@ -10,12 +10,15 @@ import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class UAContext {
-	private static final long LONG_SIZE = 8;
-	private static final long FLOAT_SIZE = 4;
+	private static final int LONG_SIZE = 8;
+	private static final int FLOAT_SIZE = 4;
+	private static final int DICT_RECORD_LENGTH = 14;
 	
 	private UAHashTable gh;
 	private long termContextRecordSize;
@@ -29,9 +32,9 @@ public class UAContext {
 			File[] files = new File(inputDirectory).listFiles();
 			new File(outputDirectory).mkdirs();
 			BufferedWriter logs = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDirectory + "/errors.log"), StandardCharsets.UTF_8));
-			int distictWords = fillGlobalHashTableGetDistictWords(files, logs);
-			termContextRecordSize = distictWords * LONG_SIZE;
-			fillLongs(files, outputDirectory, logs, windowSize);
+			int distinctWords = fillGlobalHashTableGetDistictWords(files, logs);
+			termContextRecordSize = distinctWords;
+			fillLongs(files, outputDirectory, logs, windowSize, distinctWords);
 			
 			logs.close();
 		} catch(Exception e) {
@@ -69,24 +72,76 @@ public class UAContext {
 				}
 			} catch(Exception e) {
 				logs.write("Error reading: " + file.getAbsolutePath());
+				logs.newLine();
 			}
 		}
 		
 		return termId;
 	}
 	
-	private void fillLongs(File[] files, String outputDirectory, BufferedWriter logs, int windowSize) throws IOException {
+	private void fillLongs(File[] files, String outputDirectory, BufferedWriter logs, int windowSize, int totalWords) throws Exception {
+		List<String> words;
+		BufferedReader in;
+		String word;
+		int i;
+		int j;
 		
+		RandomAccessFile longs = new RandomAccessFile(outputDirectory + "/longs.raf", "rw");
+		
+		for (File file : files) {
+			try {
+				in = new BufferedReader(new InputStreamReader(new FileInputStream(file)));
+				words = new ArrayList<>(5000);
+				
+				while ((word = in.readLine()) != null) {
+					words.add(word);
+				}
+				
+				for (i = 0; i < words.size(); i++) {
+					word = words.get(i);
+					for (j = 1; j <= windowSize; j++) {
+						if (i - j >= 0) {
+							updateLongRecord(gh.search(word).getPosition(), gh.search(words.get(i - j)).getPosition(), totalWords, longs);
+						}
+						if (i + j < words.size()) {
+							updateLongRecord(gh.search(word).getPosition(), gh.search(words.get(i + j)).getPosition(), totalWords, longs);
+						}
+					}
+				}
+				
+				in.close();
+			} catch(Exception e) {
+				logs.write("Error reading: " + file.getAbsolutePath());
+				logs.newLine();
+			}
+		}
+		
+		longs.close();
 	}
 	
-	private void makeRAFFile(String outputDirectory) throws IOException {
+	private void fillFloats(String outputDirectory, int totalWords, BufferedWriter logs) throws Exception {
+		RandomAccessFile longs = new RandomAccessFile(outputDirectory + "/longs.raf", "r");
+		RandomAccessFile tc = new RandomAccessFile(outputDirectory + "/term-context.raf", "rw");
+		
+		
+		longs.close();
+		tc.close();
+	}
+	
+	private void makeRAFFile(String outputDirectory, int totalWords) throws IOException {
 		try {
 			RandomAccessFile longs = new RandomAccessFile(outputDirectory + "/longs.raf", "rw");
 			RandomAccessFile dict = new RandomAccessFile(outputDirectory + "/dict.raf", "rw");
 			UARecord[] records = gh.getTable();
 			
 			for (int i = 0; i < records.length; i++) {
-				
+				dict.seek(i * (DICT_RECORD_LENGTH + 2));
+				if (records[i] != null) {
+					dict.writeUTF(formatDictRecord(records[i].getWord(), records[i].getPosition()));
+					fillFullLongRecord(totalWords, records[i].getPosition(), records[i].getCount(), longs);
+				} else {
+					dict.writeUTF(formatDictRecord("-1", -1));
+				}
 			}
 			
 			longs.close();
@@ -94,6 +149,29 @@ public class UAContext {
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private String formatDictRecord(String term, int position) {
+		if (term.length() > 8) {
+			term = term.substring(0, 8);
+		}
+		return String.format("%-" + DICT_RECORD_LENGTH + "s", String.format("%s%06d", term, position));
+	}
+	
+	private void fillFullLongRecord(int totalWords, int position, long count, RandomAccessFile longs) throws Exception {
+		for (int i = 0; i < totalWords; i++) {
+			longs.seek((position * termContextRecordSize * (LONG_SIZE + 2)) + (i * (LONG_SIZE + 2)));
+			longs.writeLong(0);
+		}
+	}
+	
+	private void updateLongRecord(int firstPos, int secondPos, int totalWords, RandomAccessFile longs) throws Exception {
+		longs.seek((firstPos * termContextRecordSize * (LONG_SIZE + 2)) + (secondPos * (LONG_SIZE + 2)));
+		longs.writeLong(longs.readLong() + 1);
+	}
+	
+	private float log2(float x) {
+		return (float)(Math.log(x) / Math.log(2));
 	}
 
 }
