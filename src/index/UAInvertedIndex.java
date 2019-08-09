@@ -42,6 +42,10 @@ public class UAInvertedIndex {
         File inDir = new File(args[0]);
         File outDir = new File(args[1]);
 
+        outDir.mkdir();
+        (new File("temp")).mkdir();
+        (new File("tmp")).mkdir();
+
         RandomAccessFile stat = new RandomAccessFile(outDir.getPath()+"/stats.raf","rw");
         stat.seek(0);
         stat.writeUTF(NA);
