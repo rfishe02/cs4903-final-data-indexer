@@ -6,6 +6,12 @@ public class UARecord {
 	private long count;
 	private float ppmi;
 	
+	public UARecord(String word, long count, float ppmi) {
+		this.word = word;
+		this.count = count;
+		this.ppmi = ppmi;
+	}
+	
 	public String getWord() {
 		return word;
 	}

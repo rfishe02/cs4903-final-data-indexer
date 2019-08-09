@@ -54,6 +54,10 @@ public class UAHashTable {
 		return hashMapSize;
 	}
 	
+	public int fullSize() {
+		return table.length;
+	}
+	
 	private void resize() {
 		UARecord[] A = table;
 		table = new UARecord[findPrime()];
