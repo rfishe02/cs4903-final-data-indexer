@@ -27,6 +27,10 @@ public class Clean {
     File input = new File(args[0]);
     File output = new File(args[1]);
 
+    if(!output.exists()) {
+      output.mkdir();
+    }
+
     calcDocFreq(input);
     cleanFiles(input,output);
 
