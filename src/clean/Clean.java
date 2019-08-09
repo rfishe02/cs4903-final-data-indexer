@@ -15,11 +15,18 @@ public class Clean {
   static int docs = 0;
 
   public static void main(String[] args) {
+
+    /*
+    args = new String[2];
+    args[0] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\input\\clean";
+    args[1] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean";*/
+
     File input = new File(args[0]);
     File output = new File(args[1]);
 
     calcDocFreq(input);
     cleanFiles(input,output);
+
   }
 
   public static String formatString(String s) {
@@ -30,14 +37,12 @@ public class Clean {
     len = Math.min(s.length(),8);
 
     for(int i = 0; i < len; i++) {
-        if((int)s.charAt(i) > 127) {
-            out += "?";
-        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 || (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
+        if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 || (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
             out += s.charAt(i);
         } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
             out += (char)((int)s.charAt(i) + 32);
         }
-    }
+    } // Only choose ASCII characters.
 
     if(out.length() > 7) {
       out = out.substring(0,8);
@@ -63,30 +68,66 @@ public class Clean {
     String[] spl;
 
     try {
+      allDoc = new HashMap<>(10000000);
+
       File[] files = inDir.listFiles();
-      allDoc = new HashMap<>(3000000);
+      File[] zDir;
 
       for(File f : files) {
-        br = new BufferedReader(new FileReader(f));
-        set = new HashSet<String>(10000);
 
-        while((read=br.readLine())!=null) {
+        zDir = f.listFiles();
+        if(zDir != null) {
 
-          spl = read.split("([\\s-&])+");
+          for(File z : zDir) {
 
-          for(String s : spl) {
-            s = formatString(s);
+            br = new BufferedReader(new FileReader(z));
+            set = new HashSet<String>(100000);
 
-            if( !set.contains(s) ){
-              countTerm(allDoc,s);
-              set.add(s);
+            while((read=br.readLine())!=null) {
+
+              spl = read.split("([\\s-&])+");
+
+              for(String s : spl) {
+                s = formatString(s);
+
+                if( !set.contains(s) ){
+                  countTerm(allDoc,s);
+                  set.add(s);
+                }
+
+              }
+
             }
+            docs++;
+            br.close();
 
           }
 
+        } else {
+
+          br = new BufferedReader(new FileReader(f));
+          set = new HashSet<String>(100000);
+
+          while((read=br.readLine())!=null) {
+
+            spl = read.split("([\\s-&])+");
+
+            for(String s : spl) {
+              s = formatString(s);
+
+              if( !set.contains(s) ){
+                countTerm(allDoc,s);
+                set.add(s);
+              }
+
+            }
+
+          }
+          docs++;
+          br.close();
+
         }
-        docs++;
-        br.close();
+
       }
 
     } catch(Exception ex) {
@@ -96,7 +137,7 @@ public class Clean {
   }
 
   public static void cleanFiles(File inDir, File outDir) {
-    HashSet<String> vocab = new HashSet<String>(100000);
+    HashSet<String> vocab = new HashSet<String>(3000000);
     HashMap<String,Integer> thisDoc;
     Queue<String> terms;
     BufferedReader br;
@@ -104,65 +145,148 @@ public class Clean {
     String temp;
     double idf;
     double tfIDF;
-
     int docSize;
 
     String[] spl = null;
 
     try {
+      HashSet<String> stopwords = getStopWords();
       File[] files = inDir.listFiles();
+      File[] zDir;
+      File tmp;
 
       for(File f : files) {
-        br = new BufferedReader(new FileReader(f));
-        bw = new BufferedWriter(new FileWriter(outDir.getPath()+"/"+f.getName()));
 
-        thisDoc = new HashMap<>(10000);
-        terms = new LinkedList<>();
+        zDir = f.listFiles();
+        if(zDir != null) {
 
-        docSize = 0;
+          for(File z : zDir) {
 
-        while((temp=br.readLine())!=null) {
+            tmp = new File(outDir.getPath()+"/"+f.getName());
+            tmp.mkdirs();
 
-          spl = temp.split("([\\s-&])+");
+            br = new BufferedReader(new FileReader(z));
+            bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+z.getName()));
 
-          for(String s : spl) {
-            s = formatString(s);
-            countTerm(thisDoc,s);
+            thisDoc = new HashMap<>(100000);
+            terms = new LinkedList<>();
+            docSize = 0;
 
-            terms.add(s);
-            docSize++;
+            while((temp=br.readLine())!=null) {
+
+              spl = temp.split("([\\s-&])+");
+
+              for(String s : spl) {
+                s = formatString(s);
+                countTerm(thisDoc,s);
+
+                terms.add(s);
+                docSize++;
+              }
+
+            }
+
+            while(!terms.isEmpty()) {
+              temp = terms.remove();
+
+              idf = Math.log( (double)docs / allDoc.get(temp) );
+              tfIDF = ( (double)thisDoc.get(temp) ) * idf;
+
+              if(!stopwords.contains(temp)) {
+
+                if( idf > 2 && thisDoc.get(temp) > 1 && allDoc.get(temp) > 20 ) {
+
+                  bw.write(temp+"\n");
+
+                  if(!vocab.contains(temp)) {
+                    vocab.add(temp);
+                  }
+
+                }
+
+              }
+
+            } // end while loop
+
+            br.close();
+            bw.close();
+
           }
+
+        } else {
+
+          br = new BufferedReader(new FileReader(f));
+          bw = new BufferedWriter(new FileWriter(outDir.getPath()+"/"+f.getName()));
+
+          thisDoc = new HashMap<>(100000);
+          terms = new LinkedList<>();
+
+          docSize = 0;
+
+          while((temp=br.readLine())!=null) {
+
+            spl = temp.split("([\\s-&])+");
+
+            for(String s : spl) {
+              s = formatString(s);
+              countTerm(thisDoc,s);
+
+              terms.add(s);
+              docSize++;
+            }
+
+          }
+
+          while(!terms.isEmpty()) {
+            temp = terms.remove();
+
+            idf = Math.log( (double)docs / allDoc.get(temp) );
+            tfIDF = ( (double)thisDoc.get(temp) ) * idf;
+
+            if(!stopwords.contains(temp)) {
+
+              if( idf > 2 && thisDoc.get(temp) > 1 && allDoc.get(temp) > 20 ) {
+
+                bw.write(temp+"\n");
+
+                if(!vocab.contains(temp)) {
+                  vocab.add(temp);
+                }
+
+              }
+
+            }
+
+          } // end while loop
+
+          br.close();
+          bw.close();
 
         }
 
-        while(!terms.isEmpty()) {
-          temp = terms.remove();
-
-          idf = Math.log( (double)docs / allDoc.get(temp) );
-          tfIDF = ( (double)thisDoc.get(temp) ) * idf;
-
-          if( idf > 1.3 && thisDoc.get(temp) > 1 && allDoc.get(temp) > 20 ) {
-
-            //bw.write(  String.format(  "%20s tfidf: %-12.4f idf: %-12.4f all: %-8d this: %-8d rtf: %-12.4f \n", temp, tfIDF, idf, allDoc.get(temp), thisDoc.get(temp), ( (double)thisDoc.get(temp)/docSize )  )  );
-            bw.write(temp+"\n");
-
-            if(!vocab.contains(temp)) {
-              vocab.add(temp);
-            }
-          }
-
-        } // end while loop
-
-        br.close();
-        bw.close();
       } // end for loop
+
+      writeVocab(vocab);
+      System.out.println(vocab.size());
 
     } catch(Exception ex) {
       ex.printStackTrace();
       System.exit(1);
     }
 
-    System.out.println(vocab.size());
+  }
+
+  public static HashSet<String> getStopWords() throws IOException {
+
+    HashSet<String> stop = new HashSet<String>(300);
+    BufferedReader br = new BufferedReader( new FileReader("stopwords.txt") );
+    String read;
+
+    while((read = br.readLine())!=null) {
+      stop.add(read);
+    }
+
+    return stop;
 
   }
 
