@@ -194,7 +194,7 @@ public class Clean {
 
               if(!stopwords.contains(temp)) {
 
-                if( idf > 2 && thisDoc.get(temp) > 1 && allDoc.get(temp) > 20 ) {
+                if( idf > 3 && allDoc.get(temp) > 30 ) {
 
                   bw.write(temp+"\n");
 
