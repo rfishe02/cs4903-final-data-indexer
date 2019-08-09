@@ -1,707 +1,527 @@
-/******************************
- * Name: 		Martin Tran
- * Username:	uatext
- * Problem Set:	PS3
- * Due Date:	7-30-19
- ******************************/
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.RandomAccessFile;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
+/********************************
+Name: Renae Fisher
+Username: text05
+Problem Set: PS3
+Due Date: 7/15/19
+********************************/
+
+import java.io.*;
+import java.util.TreeMap;
+import java.util.SortedMap;
 import java.util.Iterator;
-import java.util.LinkedList;
-import java.util.PriorityQueue;
-import java.util.Set;
-    
-    public class UAInvertedIndex {
-    	
-    	protected GlobalHashTable ght;
-    	
-		public static void main(String[] args) throws IOException, FileNotFoundException {
-			UAInvertedIndex index = new UAInvertedIndex();
-			index.buildInvertedIndex("./processedTokens/", "./invertedIndexFiles"); 
-		}	
-		
-		/**
-		 * Container class to hold various different information
-		 * about a word.
-		 */
-		
-		public static class GlobalWord {
-			
-			protected int termId, numDocs, count;
-			protected int start;
-			protected String word;
-			protected LinkedList<Integer> link;
-			
-			public GlobalWord(String word) {
-				this.word = word;
-				start = 0;
-				link = new LinkedList<Integer>();
-				numDocs = 0;
-				count = 1;
-			}
+import java.util.Map;
+import java.util.Comparator;
+import java.nio.charset.*;
 
-			public int getStart() {
-				return start;
-			}
+/** A class that builds an inverted index from a directory of tokenized files.
+Each file must have a single token on each line. */
 
-			public void setStart(int start) {
-				this.start = start;
-			}
+public class UAInvertedIndex {
+  static final String NA = "NULL";
+  static final int DOCID_LEN = 8;
+  static final int STR_LEN = 8;
+  static final int MAP_LEN = 25;
+  static GlobalMap gh;
+  static int seed = 5000000;
+  static final int RTF_LEN = 8; //0.029304
 
-			public String getWord() {
-				return word;
-			}
+  /**
+  @param args Accepts the following arugments from the command line: [input tokenized files] [output for random access files].
+  */
 
-			public void setTermId(int termId) {
-				this.termId = termId;
-			}
-			
-			public boolean equals(GlobalWord gw) {
-				if (this.word.equals(gw.word)) {
-					return true;
-				}
-				return false;
-			}
-			
-			/**
-			 * Resizing function that makes the original hash table
-			 * 1.5x bigger. 
-			 * @param ght The table to be resized
-			 * @return Resized hash table
-			 * Time Complexity: O(V)
-			 * Space Complexity: O(V^2)
-			 */
-			
-			public GlobalWord[] resize(GlobalHashTable ght) {
-				
-				GlobalWord[] temp = new GlobalWord[(int) (ght.globalTable.length * 1.5)];
-				
-				for (int i = 0; i < ght.globalTable.length; i++) {
-					if (ght.globalTable[i] != null) {
-						int increment = 0;
-						int code = hash(ght.globalTable[i], increment, ght);
-						while (ght.globalTable[i].equals(temp[code])) {
-							code = hash(ght.globalTable[i], increment, ght);
-						}
-						temp[code] = ght.globalTable[i];
-					}
-				}
-				
-				return temp;
-			}
-			
-			/**
-			 * Hashing function for the word
-			 * @param word The word to be hashed
-			 * @param increment Increment value used for linear probing
-			 * @param ght Used to get the length of the global hash table
-			 * @return Position to hash to
-			 * Time Complexity: O(1)
-			 * Space Complexity: O(V)
-			 */
-			
-			public int hash(GlobalWord word, int increment, GlobalHashTable ght) {
-				return Math.abs((word.word.hashCode() + increment) % ght.globalTable.length);
-			}
+  public static void main(String[] args) {
 
-			public String toString() {
-				return word;
-			}
-			
-		}
-		
-		
-		/**
-		 * Custom hash table in order to write to the dict.raf file
-		 * 
-		 *
-		 */
-		public static class GlobalHashTable {
-			
-			protected GlobalWord[] globalTable;
-			protected int currentSize;
-			
-			public GlobalHashTable() {
-				globalTable = new GlobalWord[150000];
-				currentSize = 0;
-			}
-			
-			/**
-			 * Get function to retrieve a GlobalWord
-			 * @param word "String" word to get back a GlobalWord
-			 * @return GlobalWord found
-			 * Time Complexity: O(1)
-			 * Space Complexity: O(V)
-			 */
-			
-			public GlobalWord get(GlobalWord input) {
-				
-				if(input == null) {
-					return null;
-				}
-				
-				int increment = 0;
-				int code = input.hash(input, increment, this);
-				int i = 0;
-				while (globalTable[code] != null && !input.word.equals(globalTable[code].word)) {
-					if (i == globalTable.length)
-						return null;
-					increment++;
-					code = input.hash(input, increment, this);
-					i++;
-				}
-				return globalTable[code];
-			}
-			
-			public int getIndex(GlobalWord input) {
-				int increment = 0;
-				int code = input.hash(input, increment, this);
-				int i = 0;
-				while (globalTable[code] != null && !input.word.equals(globalTable[code].word)) {
-					if (i == globalTable.length)
-						return -1;
-					increment++;
-					code = input.hash(input, increment, this);
-					i++;
-				}
-				return code;
-			}
-			
-			public boolean remove(GlobalWord word) {
-				int index = getIndex(word);
-				if (index == -1) {
-					return false;
-				} else {
-					globalTable[index] = null;
-					return true;
-				}
-			}
-			
-			/**
-			 * Put function to place a GlobalWord into the hash table
-			 * @param word Word to be put in the hash table
-			 * Time Complexity: O(1)
-			 * Space Complexity: O(V)
-			 */
-			public void put(GlobalWord word) {
-				
-				if (word == null) {
-					return;
-				}
-				int power = 0;
-				int code = word.hash(word, power, this);
-				
-				if (currentSize / globalTable.length >= 0.33) {
-					globalTable = word.resize(this);
-				}
-				
-				while (globalTable[code] != null) {
-					if (word.equals(globalTable[code])) {
-						return;
-					}
-					
-					power++;
-					code = word.hash(word, power, this);
-				}
-				
-				globalTable[code] = word;
-			}
-			
+    if(args == null || args.length < 2) {
 
-			
-			
-			
-		}
-		
-		
-		/**
-		 * Building of the inverted index. Used to build the mapRaf.raf, dict.raf, and post.raf
-		 * @param inputDirectory Directory of pre-processed tokens
-		 * @param outputDirectory Directory to store generated .temp files 
-		 * @throws IOException Handles any IO errors that may occur
-		 * @throws FileNotFoundException Handles any file and directory issues
-		 * Time Complexity: O(Dlg(D^2*d^3))
-		 * Space Complexity: O(V^2*log(D))
-		 */
-		public void buildInvertedIndex(String inputDirectory, String outputDirectory) throws IOException, FileNotFoundException {
-		
-				GlobalHashTable globalHashTable = new GlobalHashTable();
-				//HashMap<String, GlobalWord> index = new HashMap<String, GlobalWord>();
-				HashMap<String, Integer> docHashTable;
+      System.out.println("the application requires the arguments: [input dir.] [output dir.]");
 
-				BufferedReader reader;
-				BufferedWriter writer;
-				File[] files = new File(inputDirectory).listFiles();
-				RandomAccessFile mapRaf = new RandomAccessFile("./raf/mapRaf.raf", "rw");
-				BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/mapRaf.txt"));
-				int termId = 0;
-				
-				for (int i = 0; i < files.length; i++) {
+    } else {
 
-					int totalFreq = 0;
-					docHashTable = new HashMap<String, Integer>();
-					reader = new BufferedReader(new FileReader(inputDirectory + i + "p.html.out"));
-					if (i <= files.length / 2 )
-						writer = new BufferedWriter(new FileWriter(outputDirectory + "/doc" + i + ".temp"));
-					else 
-						writer = new BufferedWriter(new FileWriter(outputDirectory + "1/doc" + i + ".temp"));
-					String input = reader.readLine();
-					
-					while (input != null) {
+      try {
+        File inDir = new File(args[0]);
+        File outDir = new File(args[1]);
 
-						if (docHashTable.get(input) == null) {
-							docHashTable.put(input, 1);
-							totalFreq++;
+        outDir.mkdir();
+        (new File("temp")).mkdir();
+        (new File("tmp")).mkdir();
 
-						} else {
-							docHashTable.put(input, docHashTable.get(input) + 1);
-							totalFreq++;
-						}
-						
+        RandomAccessFile stat = new RandomAccessFile(outDir.getPath()+"/stats.raf","rw");
+        stat.seek(0);
+        stat.writeUTF(NA);
 
-						
-						input = reader.readLine();
-					}
+        gh = new GlobalMap(seed); // Initialize global hash table.
+        buildInvertedIndex(inDir,outDir,stat);
 
-					Set<String> set = docHashTable.keySet();
-					Object[] terms = set.toArray();
-					
-					for (int y = 0; y < terms.length; y++) {
-						
-						GlobalWord current = new GlobalWord((String)terms[y]);
-						if (globalHashTable.get(current) == null) {
-							globalHashTable.put(current);
-							globalHashTable.get(current).setTermId(termId);
-							termId++;
-						} else {
-							globalHashTable.get(current).count++;
-						}	
-						
-						if (globalHashTable.get(current).link.contains(i) == false) {
-							globalHashTable.get(current).link.add(i);
-							globalHashTable.get(current).numDocs++;
-						}
-						
-	
-					}
-					
-					if (terms.length > 0) {
-						Arrays.sort(terms, 0, terms.length - 1);
-					} else {
-						continue;
-					}
-					
-					
+        stat.writeInt( STR_LEN );
+        stat.writeInt( MAP_LEN );
+        stat.writeInt( 2 );
+        stat.writeInt( 2 );
+        stat.writeInt(gh.map.length);
+        stat.close();
 
-					for (int x = 0; x < terms.length; x++) {
-						
-						GlobalWord current = new GlobalWord((String)terms[x]);
-						Collections.sort(globalHashTable.get(current).link);
-							writer.write(String.format("%s,%08d,%.8f", current, i, (float)(docHashTable.get((String)terms[x]) / (float)totalFreq)));
-							writer.newLine();
-						
-					}
-				
-					mapRaf.seek(i*22);
-					String name = files[i].getName();
-					if (files[i].getName().length() > 19) {
-						name = name.substring(0, 19);
-					}
-					//s = 19
-					if (name.substring(0, name.indexOf("p")).length() < 10) {
-						name = String.format("%0" + (10-name.substring(0, name.indexOf("p")).length()) + "d%s", 0, name);
-					}
-					
-					mapRaf.writeUTF(name);
-					bw.write(name);
-					bw.newLine();
-					
-					writer.close();
-					reader.close();
+      } catch(IOException ex) {
+        ex.printStackTrace();
+        System.exit(1);
+      }
 
-				//end of big for loop
-				}
-				bw.close();
-				mapRaf.close();
-				
-		files = new File(outputDirectory + "/").listFiles();
-                File[] files2 = new File(outputDirectory + "1/").listFiles();
-                mergeFiles(files);
-                mergeFiles(files2);
-                
-                files = fileExistsArr(files);
-                files2 = fileExistsArr(files2);
-                File[] merged = new File[files.length + files2.length];
-                
-                for (int i = 0; i < files.length + files2.length; i++) {
-                	for (int y = 0; y < files.length; y++) {
-                		merged[i] = files[y];
-                		i++;
-                	}
-                	
-                	for (int y = 0; y < files2.length; y++) {
-                		merged[i] = files2[y];
-                		i++;
-                	}
+    }
+
+  }
+
+  /** This method coordinates the construction of the inverted index. It calls three methods
+  that each perform a different task.
+  @param inDir A directory of tokenized files.
+  @param outDir The destination directory for the random access files.
+  @param stat A random access file used to write statistics that will be used by the UAQuery class.
+  */
+
+  public static void buildInvertedIndex(File inDir, File outDir, RandomAccessFile stat) throws IOException {
+    int size = algoOne(inDir,outDir,new File("temp"));
+    mergeSort(new File("temp"),size); // Consolidate the temporary files produced by the first algorithm.
+    algoTwo(new File("tmp"),outDir,size);
+
+    stat.writeInt(size);
+  }
+
+  /** This method is the first phase of the algorithm that creates an inverted index.
+  It uses a map to count the frequencies of all terms in an individual document, and it
+  arranges the distinct terms in sorted order. Afterwards, it writes the terms within the map to the hard drive,
+  in sorted order, as temporary files. The global hash table will store the document frequency for each term.
+  The method also creates the map.raf file, which maps document IDs to document names.
+  @param inDir An input directory of tokenized files.
+  @param outDir The output directory for random access files.
+  @param tmpDir The output directory for the temporary files.
+  @return The number of documents, or document IDs, processed by the method.
+  */
+
+  public static int algoOne(File inDir, File outDir, File tmpDir) {
+    SortedMap<String, Integer> ht;  // Used to sort all ht entries by term alphabetically.
+    BufferedReader br;
+    BufferedWriter bw = null;
+    String read;
+    int docID = 0;
+    int totalFreq;
+
+    System.out.println("running first pass.");
+
+    try {
+      RandomAccessFile map = new RandomAccessFile(outDir.getPath()+"/map.raf","rw");
+      map.seek(0);
+
+      for(File d : inDir.listFiles()) {
+        br = new BufferedReader(new InputStreamReader(new FileInputStream(d), "UTF8"));
+
+        ht = new TreeMap<String,Integer>(new TermComparator()); // Initialize a document hash table.
+        totalFreq = 0; // Set totalFreq to zero.
+
+        while((read = br.readLine())!=null) {
+
+          //read = new String(read.getBytes("US-ASCII"));
+          //read = convertText(read,STR_LEN);
+
+          if( ht.containsKey( read ) ) {
+            ht.put( read, ht.get( read )+1);
+          } else {
+            ht.put( read, 1);
+          }
+          totalFreq++;
+
+        }
+
+        bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(tmpDir.getPath()+"/doc"+docID+".temp"), "UTF8")); // Open new temporary file f.
+        writeTempFile(bw, ht, docID, totalFreq);
+        bw.close();  // Close temp file f.
+
+        map.writeUTF( formatString(d.getName(),MAP_LEN) );
+
+        docID++;
+        br.close();
+      }
+      map.close();
+
+    } catch(Exception ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+
+    return docID;
+  }
+
+  /** This method writes sorted files to a temporary directory. It also uses the global hash table to count
+  the number of documents that each distinct term appears in.
+  @param bw The BufferedWriter linked to the temporary directory.
+  @param ht A data structure that has terms in sorted order.
+  @param docID The document ID for the current document.
+  @param totalFreq The total number of tokens in the document.
+  */
+
+  public static void writeTempFile(BufferedWriter bw, SortedMap<String, Integer> ht, int docID, int totalFreq) throws IOException {
+    String word;
+    TermData t;
+
+    for(Map.Entry<String,Integer> entry : ht.entrySet()) {
+      word = entry.getKey();
+
+      if( ( t = gh.get( word ) ) != null ) {
+        t.setCount(t.getCount() + 1);
+        //gh.put(t);
+
+      } else {
+
+        t = new TermData(word,1); // put( t, <termID, # documents = 1> )
+        gh.put(t);
+
+      } // If a term hasn't been found in prior documents.
+
+      bw.write( formatString( word, STR_LEN, docID, ((double)entry.getValue()/totalFreq) ) + "\n" ); // f.write( t, documentID, (tf / totalFrequency) )
+
+    }  // For all term t in document hash table ht, do this.
+
+  }
+
+  /** This method is the second phase of the algorithm that creates an inverted index.
+  It takes a directory of merged files and combines them into a postings file. Aftwards, the method writes the global hash table to the
+  hard drive in hash order as the dictionary file.
+  @param inDir A directory of merged files.
+  @param outDir The directory for the random access files.
+  @param size The total number of documents.
+  */
+
+  public static void algoTwo(File inDir, File outDir, int size) {
+    System.out.println("running second pass.");
+
+    TermData t;
+    String read = "";
+    String top = "";
+    int topInd = 0;
+    int recordCount = 0;
+    int nullCount = 0;
+    float rtf;
+    float idf;
+
+    try {
+      File[] files = inDir.listFiles();
+
+      BufferedReader[] br = new BufferedReader[files.length];
+      for(int a = 0; a < files.length; a++) {
+        br[a] = new BufferedReader(new InputStreamReader(new FileInputStream(files[a]), "UTF8"));
+      }
+
+      RandomAccessFile post = new RandomAccessFile(outDir.getPath()+"/post.raf","rw"); // Create & open a new file for postings, post.raf .
+      post.seek(0);
+
+      /*
+      Consider using a data structure, such as a priority queue, to improve the runtime of this algorithm.
+      */
+
+      while(nullCount < br.length) {
+        nullCount = 0;
+        br[topInd].mark(100);
+        top = br[topInd].readLine();
+
+        for(int b = 0; b < br.length; b++) {
+
+          if(b != topInd) {
+
+            br[b].mark(100);
+
+            if(top == null) {
+              br[topInd].mark(100);
+              nullCount++;
+
+              top = br[b].readLine();
+              topInd = b;
+
+            } else if( (read = br[b].readLine()) != null ) {
+
+              if( read.substring(0,STR_LEN).compareTo(top.substring(0,STR_LEN)) < 0 ) {
+                br[topInd].reset();
+                top = read;
+                topInd = b;
+              } else {
+                if( read.substring(0,STR_LEN).compareTo(top.substring(0,STR_LEN)) == 0 ) {
+
+                  if( Integer.parseInt(read.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) < Integer.parseInt(top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) ) {
+                    br[topInd].reset();
+                    top = read;
+                    topInd = b;
+                  } else {
+                    br[b].reset();
+                  }
+
+                } else {
+                  br[b].reset();
                 }
-                
-               
-                writePostingRaf(merged, globalHashTable);
-                writeDictRaf(globalHashTable);
+              } // If the two are similiar, compare the document IDs.
 
-			//end of buildInvertedIndex
-		}
+            } else {
+              br[b].mark(100);
+              nullCount++;
+            }
 
+          }
+        } // find token that is alphabetically first in the buffer.
 
-		public void mergeFiles(File[] files) throws IOException {
-	                int counter = 0;
-	                BufferedReader rightReader = null;
-	                BufferedReader leftReader = null;
-	                BufferedWriter bw = null;
-	                while (files.length > 500) {
+        //System.out.println(top.substring(0,STR_LEN).trim());
 
-                        if (counter >= 500) {
-                                counter = 0;
-                                files = fileExistsArr(files);
-                                System.out.println(files.length);
-			}
+        t = gh.get( top.substring(0,STR_LEN).trim() );
 
-                                        int numLinesFile1 = -1;
-                                        int numLinesFile2 = -1;
+        rtf = (float) Double.parseDouble( top.substring( (STR_LEN+1 + DOCID_LEN), top.length() ) );
+        idf = (float) Math.log( (double) size / t.getCount() ); // Calculate inverse document frequency for term from gh(t).numberOfDocuments .
 
-            					if (counter + 1 < files.length && files[counter] != null && files[counter + 1] != null && files[counter].isFile() && files[counter + 1].isFile()) {
-                                                numLinesFile1 = (int)Files.lines(Paths.get(files[counter].getPath())).count();
-                                                numLinesFile2 = (int)Files.lines(Paths.get(files[counter + 1].getPath())).count();
-                                        } else {
-                                                counter++;
-                                                continue;
-                                        }
+        t.setStart(recordCount);  // Update the start field for the token in the global hash table. ** FIX THIS, IT SHOULD HAPPEN ONCE PER TERM. **
+        //gh.put( t );
 
-                                        merge(files[counter].getAbsolutePath(), files[counter + 1].getAbsolutePath(), numLinesFile1, numLinesFile2, files, counter, leftReader, rightReader, bw);
-                                        counter += 2;
+        post.writeInt( Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ) ); // Write postings record for the token (documentID, termFrequency, OR rtf * idf) .
+        post.writeFloat( rtf * idf );
 
-	                }
+        recordCount = recordCount + 1;
 
-		}
-	
-			/**
-			 * Counts the amount of existing files left
-			 * @param arr File[] to count
-			 * @return Number of existing files
-			 * Time Complexity: O(D)
-			 * Space Complexity: O(D)
-			 */
-			public int countExists(File[] arr) {
-				int count = 0;
-				for (int i = 0; i < arr.length; i++) {
-					if (arr[i] != null && arr[i].isFile())
-						count++;
-				}
-				return count;
-			}
-			
-			/**
-			 * Creates a new File[] to accommodate for deleted files
-			 * @param arr File[] to be processed for nonexisting files
-			 * @return New File[] that has all files that exists
-			 * Time Complexity: O(D)
-			 * Space Complexity: O(D^2)
-			 */
-			public File[] fileExistsArr(File[] arr) {
-				int count = countExists(arr);
-				File[] temp = new File[count];
-				int i = 0;
-				int x = 0;
-				while (x < count) {
-					if (arr[i] == null || !arr[i].isFile()) {
-						i++;
-						continue;
-				} else {
-						temp[x] = arr[i];
-						x++;
-						i++;
-					}
-				}
-				
-				return temp;
-			}
-			
-			/**
-			 * Helper method to calculate Inverse Document Frequency
-			 * @param totalDocs Total number of documents in directory
-			 * @param count Total occurrences of a specified word
-			 * @return IDF value
-			 * Time Complexity: O(1)
-			 * Space Complexity: O(1)
-			 */
-			public float idf(int totalDocs, int count) {
-				return (float)Math.log((float)totalDocs / count);
-			}
+      } // While all postings haven't been written do this.
 
-			/**
-			 * Merge method to merge together files to fit into about the 1000 file range that Linux can open.
-			 * @param file1 First file to be merged
-			 * @param file2 Second file to be merged
-			 * @param numLinesFile1 Number of lines in file one
-			 * @param numLinesFile2 Number of lines in file two
-			 * @param files Listing of all the files in the outputDirectory
-			 * @param counter Used to delete a file about merging one
-			 * @throws IOException Handles any IO errors that may occur during merging
-			 * Time Complexity: O(d^3)
-			 * Space Complexity: O(D*d^2)
-			 */
-		private void merge(String file1, String file2, int numLinesFile1, int numLinesFile2, File[] files, int counter, BufferedReader leftReader, BufferedReader rightReader, BufferedWriter bw) throws IOException {
-				if (numLinesFile1 == -1 || numLinesFile2 == -1) {
-					return;
-				}
-				
-				leftReader  = new BufferedReader(new FileReader(file1));
-				rightReader = new BufferedReader(new FileReader(file2));
-                                bw = new BufferedWriter(new FileWriter(file1));
-			try {				
-				String[] leftArr 	= new String[numLinesFile1 + 1];
-				String[] rightArr 	= new String[numLinesFile2 + 1];
-				
-				for (int i = 0; i < numLinesFile1; i++) {
-					String input = leftReader.readLine();
-					if (input != null) {
-						leftArr[i] = input;
-					}
-				}
-				
-				leftArr[numLinesFile1] = "-1";
-				
-				for (int i = 0; i < numLinesFile2; i++) {
-					String input = rightReader.readLine();
-					if (input != null) {
-						rightArr[i] = input;
-					}
-				}
-				
-				rightArr[numLinesFile2] = "-1";
-				
-				int i = 0, j = 0;
-				
-				for (int k = 0; k < numLinesFile2 + numLinesFile1; k++) {
-					
-					if (i == numLinesFile1 && leftArr[i].equals("-1")) {
-						while (j < numLinesFile2 && rightArr[j] != null && !rightArr[j].equals("-1")) {
-							bw.write(rightArr[j]);
-							bw.newLine();
-							j++;
-						}
-						break;
-					}
-					
-					if (j == numLinesFile2 && rightArr[j].equals("-1")) {
-						while (i < numLinesFile2 && leftArr[i] != null && !leftArr[i].equals("-1")) {
-							bw.write(rightArr[i]);
-							bw.newLine();
-							i++;
-						}
-						break;
-					}
-					
-					if (i < numLinesFile1 && leftArr[i] != null && leftArr[i].compareTo(rightArr[j]) <= 0) {
-						bw.write(leftArr[i]);
-						bw.newLine();
-						i++;
-						
-					} else {
-						if (j < numLinesFile2 && rightArr[j] != null) {
-							bw.write(rightArr[j]);
-							j++;
-							bw.newLine();
-						}
-					}
-				}
-			} catch (IOException e) {
-				System.out.println(e.getMessage());
-			} finally {
-				rightReader.close();
-				leftReader.close();
-				bw.close();
-			}
-				files[counter + 1].delete();
+      post.close();
 
+      for(BufferedReader b : br) {
+        b.close();
+      }
 
-			}
-			/**
-			 * Method to write the global hash table into the dict.raf file
-			 * @param globalTable Global hash table to be written to file
-			 * @throws IOException Handles any IO errors that the RandomAccessFile may generate
-			 * Time Complexity: O(V)
-			 * Space Complexity: O(V)
-			 */
-			public void writeDictRaf(GlobalHashTable ght) throws IOException {
-                RandomAccessFile dictRaf = new RandomAccessFile("./raf/dict.raf", "rw");
-                BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/dict.txt"));
-                //Size = 22
-                for (int i = 0; i < ght.globalTable.length; i++) {
+      writeDictionary(outDir);
 
-                	GlobalWord current = ght.get(ght.globalTable[i]);
-                	if (current != null && current.word.equals("data")) {
-                		System.out.println("data");
-                	}
-                	if (current == null) {
-                		dictRaf.seek(i * 29);
-                		dictRaf.writeUTF(String.format("%03d%s%05d%06d%08d", 0, "blank", -1, -1, -1));
-                		bw.write(String.format("%03d%s%05d%06d%08d", 0, "blank", -1, -1, -1));
-                		bw.newLine();
-                	} else if (8-current.word.length() > 0){
-                		dictRaf.seek(i * 29);
-                		dictRaf.writeUTF(String.format("%0" + (8-current.word.length()) + "d%s%05d%06d%08d", 0, current.word, current.termId, current.numDocs, current.start));
-                		bw.write(String.format("%0" + (8-current.word.length()) + "d%s%05d%06d%08d", 0, current.word, current.termId, current.numDocs, current.start));
-                		bw.newLine();
-                	} else {
-                		dictRaf.seek(i * 29);
-                		dictRaf.writeUTF(String.format("%s%05d%06d%08d", current.word, current.termId, current.numDocs, current.start));
-                		bw.write(String.format("%s%05d%06d%08d", current.word, current.termId, current.numDocs, current.start));
-                		bw.newLine();
-                	}
-                }
-                bw.close();
-                dictRaf.close();
-			}
-			
-			/**
-			 * Function to write the postings list to the post.raf file
-			 * @param index HashMap of String, GlobalWord for easy retrieval
-			 * @param files File[] of all files in directory
-			 * @param globalHashTable Global hash table
-			 * @throws IOException Handles any IO errors during writing to the post.raf file
-			 * Time Complexity: O(D^3)
-			 * Space Complexity: O(V^2D^3)
-			 */
-			public void writePostingRaf(File[] files, GlobalHashTable globalHashTable) throws IOException {
-                RandomAccessFile postRaf = new RandomAccessFile("./raf/post.raf", "rw");
-                int recordCount = 0;
-                BufferedWriter bw = new BufferedWriter(new FileWriter("./raf/post.txt"));
-                
-            	BufferedReader[] readers = new BufferedReader[files.length];
-                
-            	for (int i = 0; i < files.length; i++) {
-            		if (files[i].isFile()) 
-            			readers[i] = new BufferedReader(new FileReader(files[i]));
-                }
-            	
-            	PriorityQueue<String> queue = new PriorityQueue<String>(new FormatQueue());
-            	boolean complete = false;
-            	
-            	for (int i = 0; i < readers.length; i++) {
-            		if (readers[i] != null) {
-            			String input = readers[i].readLine();
-            			if (input != null)
-            				queue.add(input + "|" + i);
-            		}
-            	}
-            	String previous = queue.peek();
-            	while (complete == false) {	                
-                	if (queue.size() == 0) {
-                		complete = true;
-                		break;
-                	}
-                    
-	                String extracted = queue.poll();
-	                int top = Integer.parseInt(extracted.substring(extracted.indexOf("|") + 1));
-	                String[] temp = extracted.split(",");
-	                extracted = temp[0];
-	                GlobalWord gWord = new GlobalWord(extracted);
-	                gWord = globalHashTable.get(gWord);
-	                if (globalHashTable.get(gWord) == null) {
-	                	String current = readers[top].readLine() + "|" + top;
-	                	if (current.equals(previous)) {
-	                		previous = current;
-	                		current = readers[top].readLine() + "|" + top;
-	                		if (current.substring(0, current.indexOf("|")).equals("null")) {
-	                			readers[top] = null;
-	                			continue;
-	                		}
-	                		while (previous.equals(current)) {
-	                			current = readers[top].readLine() + "|" + top;
-	                		}
-	                	}
-	                	previous = current;
-	                	queue.add(current);
-	                	continue;
-	                }
+    } catch(IOException ex) {
+      ex.printStackTrace();
+      System.exit(1);
+    }
+  }
 
-	                globalHashTable.get(gWord).setStart(recordCount);
-	                
-	                
-	                float idf = idf(files.length, globalHashTable.get(gWord).numDocs);
-	                float rtfidf = ((float)globalHashTable.get(globalHashTable.get(gWord)).count / files.length) * idf;
-	                	
-	                Iterator<Integer> iter = globalHashTable.get(gWord).link.iterator();
-	                if (extracted.equals("http")) {
-	                	System.out.println();
-	                }
-                	//long position = 0;
-	            	int counter = 0;
-	                while (globalHashTable.get(gWord) != null && iter.hasNext()) {
-	                	int document = iter.next();
-	                	int x = (gWord.start + counter) * (27 + 2);
-	                	postRaf.seek((gWord.start + counter) * (27 + 2));
-	                	
-		                if (extracted.equals("http")) {
-		                	System.out.println(postRaf.getFilePointer());
+  /**  This method writes the dictionary file to disk. It iterates over the global
+  hash map and writes every term, including null terms, as a fixed length String.
+  This implementation does not support characters that are more than a single byte.
+  @param outDir The output directory for the random access files.
+  */
 
-		                }
-		                
-		                
-	                	//position = postRaf.getFilePointer();
-	                	String rtfidfStr = rtfidf + "";
-	                	if (rtfidfStr.length() < 17) {
-		                	postRaf.writeUTF(String.format("%010d%0" + (17-rtfidfStr.length()) + "d%.17f", document, 0, rtfidf));
-		                	bw.write(String.format(String.format("%010d%0" + (17-rtfidfStr.length()) + "d%.17f", document, 0, rtfidf)));
-	                	} else {
-		                	postRaf.writeUTF(String.format("%010d%.17f", document, rtfidf));
-		                	bw.write(String.format("%010d%.17f", document, rtfidf));
-		                	
-	                	}
-	                	bw.newLine();
-	                	counter++;
-	                	iter.remove();
-	                }
-	                
-	                if (extracted.equals("http")) {
-	                	System.out.println();
-	                }
-	                
-		            recordCount++;
-		            
-		            queue.add(readers[top].readLine() + "|" + top);
-                	queue.remove(extracted + "|" + top);
-                }
-                
-                postRaf.close(); 
-                bw.close();
-			}
-			
-			public static class FormatQueue implements Comparator<String> {
+  public static void writeDictionary(File outDir) throws IOException {
+    System.out.println("writing dictionary file.");
 
-				@Override
-				public int compare(String o1, String o2) {
-					String[] temp1 = o1.split(",");
-					String[] temp2 = o2.split(",");
-					return temp1[0].compareTo(temp2[0]);
-				}
-				
-			}
+    RandomAccessFile dict = new RandomAccessFile(outDir.getPath()+"/dict.raf","rw"); //write global hash table to disk as dictionary file dict.raf
+    dict.seek(0);
 
-		//end of class
-		}
-		
+    String term;
+    int count;
+    int start;
+
+    for(int i = 0; i < gh.map.length; i++) {
+
+      if(gh.map[i] != null) {
+        term = gh.map[i].getT();
+        count = gh.map[i].getCount();
+        start = gh.map[i].getStart();
+      } else {
+        term = NA;
+        count = -1;
+        start = -1;
+      }
+
+      dict.writeUTF( formatXString(term,STR_LEN) );
+      dict.writeInt( count );
+      dict.writeInt( start );
+
+    }
+
+    dict.close();
+  }
+
+  /** Use an iterative merge sort to combine files. The basis for this sort is
+      directly from the bottom up sort shown on Wikipedia. However, the merge
+      portion is different from the example on the website. It doesn't iterate over
+      the array, it just uses the values p and q to combine files.
+      @param inDir A directory of sorted, temporary, files.
+      @param n The number files in the temporary directory.
+  */
+
+  public static void mergeSort(File inDir, int n) {
+    System.out.println("merging temporary files.");
+
+    BufferedReader L = null;
+    BufferedReader R = null;
+    BufferedWriter bw = null;
+    int size;
+
+    File[] A = inDir.listFiles();
+    int len = Math.min( 500, (int)Math.log(A.length) );
+
+    try {
+      for(int c = 1; c < n; c = 2 * c) {
+
+        size = (int)( (double)(n-1) / c );
+
+        if( size > len ) {
+          for(int p = 0; p < n-1; p += 2 * c) {
+
+            int q = Math.min(p + (c-1), n-1);
+            int r = Math.min(p + 2*(c-1), n-1);
+
+            if( (q+1) < A.length ) {
+              merge(A, L, R, bw, p, q, r);
+            }
+          }
+        } else {
+          break;  // Stop when the split reaches a certain size.
+        }
+      }
+
+    } catch(Exception ex) {
+      ex.printStackTrace();
+    }
+  }
+
+  /** Instead of iterating accross the whole array, it opens the files at p and q+1,
+     and merges them. It erases the previous files and stores the new file at A[p].
+     For example, suppose we have five files. First, it would merge the files at index 0 and 1.
+     Then, it would merge the files at 2 and 3. Now, the size of the segment will grow. The method
+     would merge file 0 and file 2. Last, the method would merge file 0 and 4.
+     @param A The array of sorted, temporary, files.
+     @param L A file at location p.
+     @param R A file at location z.
+     @param bw A new file that will contain the two files from L and R.
+     @param p The leftmost file.
+     @param q The rightmost file.
+     @param r Not used in sort, but provides additional information for filename.
+  */
+
+  public static void merge(File[] A, BufferedReader L, BufferedReader R, BufferedWriter bw, int p, int q, int r) throws IOException {
+    int z = z = q + 1;
+    String filename = "tmp/"+p+""+z+""+r+".tmp";
+
+    L = new BufferedReader(new InputStreamReader(new FileInputStream(A[p]), "UTF8")); // Open the files at the given indices.
+    R = new BufferedReader(new InputStreamReader(new FileInputStream(A[z]), "UTF8"));
+
+    bw = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(filename), "UTF8"));  // Create a new file, which will contain the merged data.
+
+    String s1 = L.readLine();
+    String s2 = R.readLine();
+
+    while(s1 != null && s2 != null) {
+
+      if( s1.substring(0,STR_LEN).compareTo(s2.substring(0,STR_LEN)) < 0 ) {
+        bw.write(s1+"\n");
+        s1 = L.readLine();
+      } else {
+        if( s1.substring(0,STR_LEN).compareTo(s2.substring(0,STR_LEN)) == 0 ) {
+          if( Integer.parseInt(s1.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) < Integer.parseInt(s2.substring(STR_LEN+1, STR_LEN+1 + DOCID_LEN).trim()) ) {
+            bw.write(s1+"\n");
+            s1 = L.readLine();
+          } else {
+            bw.write(s2+"\n");
+            s2 = R.readLine();
+          }
+        } else {
+          bw.write(s2+"\n");
+          s2 = R.readLine();
+        }
+      }
+
+    } // Compare the lines of the files.
+
+    while(s1 != null) {
+      bw.write(s1+"\n");
+      s1 = L.readLine();
+    } // Write any remaining lines to the file.
+
+    while(s2 != null) {
+      bw.write(s2+"\n");
+      s2 = R.readLine();
+    }
+
+    L.close();
+    R.close();
+    bw.close();
+
+    if(A[p].exists()) {
+      A[p].delete();
+    } // Remove the original files.
+    if(A[z].exists()) {
+      A[z].delete();
+    }
+
+    A[p] = new File(filename); // Replace the file at A[p]. Future merges will use the newly merged file.
+  }
+
+  /** The comparator used to arrange terms in the TreeMap.
+  */
+
+  static class TermComparator implements Comparator<String> {
+    public int compare(String s1, String s2) {
+      return s1.compareToIgnoreCase(s2);
+    }
+  }
+
+  /*
+  public static String convertText(String s, int limit) {
+    String out = "";
+    int len;
+
+    len = Math.min(s.length(),limit);
+
+    for(int i = 0; i < len; i++) {
+        if((int)s.charAt(i) > 127) {
+            out += "?";
+        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
+            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
+            out += s.charAt(i);
+        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
+            out += (char)((int)s.charAt(i) + 32);
+        }
+    }
+
+    if(out.length() > 7) {
+      out = out.substring(0,8);
+    }
+
+    return out;
+  }*/
+
+  /** A method used to format a String record. It trims Strings to a particular length, and
+  pads the output String with spaces. This is used to format records for the map.raf file.
+  @param str An input String.
+  @param limit The final size of the output String.
+  @return A formatted String.
+  */
+
+  public static String formatString(String str, int limit) {
+    if(str.length() > limit) {
+      str = str.substring(0,limit);
+    }
+    return String.format("%-"+limit+"s",str);
+  }
+
+  /** A method used to format the records for the temporary files. This application uses
+  a substring to compare terms, so it's necessary to write fixed length records.
+  @param str An input String.
+  @param limit The final size of the output String.
+  @param id A document ID.
+  @param rtf The relative frequency of a term.
+  @return A formatted String.
+  */
+
+  public static String formatString(String str, int limit, int id, double rtf) {
+    if(str.length() > limit) {
+      str = str.substring(0,limit);
+    }
+    return String.format("%-"+STR_LEN+"s %-"+DOCID_LEN+"d %-"+(RTF_LEN/2)+"."+(RTF_LEN/2)+"f",str,id,rtf);
+  }
+
+  /** The method used to format the String of the dictionary file.
+  @param str An input String.
+  @param limit The final size of the output String.
+  @return A formatted String.
+  */
+
+  public static String formatXString(String str, int limit) {
+    if(str.length() > limit) {
+      str = str.substring(0,limit);
+    }
+    return String.format("%-"+limit+"s",str);
+  }
+
+}
