@@ -14,6 +14,9 @@ public class Clean {
 
   static int docs = 0;
 
+  static String most = null;
+  static int max = 0;
+
   public static void main(String[] args) {
 
     /*
@@ -26,6 +29,8 @@ public class Clean {
 
     calcDocFreq(input);
     cleanFiles(input,output);
+
+    System.out.println("most frequent: "+most+", "+max);
 
   }
 
@@ -55,6 +60,12 @@ public class Clean {
   public static void countTerm(HashMap<String,Integer> map, String s) {
     if(map.containsKey(s)) {
       map.put(s,map.get(s)+1);
+
+      if(map.get(s) > max) {
+        max = map.get(s);
+        most = s;
+      }
+
     } else {
       map.put(s,1);
     }
@@ -267,7 +278,7 @@ public class Clean {
       } // end for loop
 
       writeVocab(vocab);
-      System.out.println(vocab.size());
+      System.out.println("distinct words: "+vocab.size());
 
     } catch(Exception ex) {
       ex.printStackTrace();
