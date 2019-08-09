@@ -19,7 +19,7 @@ Each file must have a single token on each line. */
 
 public class UAInvertedIndex {
   static final String NA = "NULL";
-  static final int DOCID_LEN = 5;
+  static final int DOCID_LEN = 8;
   static final int STR_LEN = 8;
   static final int MAP_LEN = 25;
   static GlobalMap gh;
