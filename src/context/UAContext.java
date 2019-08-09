@@ -8,24 +8,32 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
+import java.io.RandomAccessFile;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
 public class UAContext {
-	UAHashTable gh;
+	private static final long LONG_SIZE = 8;
+	private static final long FLOAT_SIZE = 4;
+	
+	private UAHashTable gh;
+	private long termContextRecordSize;
 	
 	public UAContext(int hashTableSize) {
 		gh = new UAHashTable(hashTableSize);
 	}
 	
-	public void buildTermContextMatrix(String inputDirectory, String outputDirectory) {
+	public void buildTermContextMatrix(String inputDirectory, String outputDirectory, int windowSize) {
 		try {
 			File[] files = new File(inputDirectory).listFiles();
 			new File(outputDirectory).mkdirs();
 			BufferedWriter logs = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputDirectory + "/errors.log"), StandardCharsets.UTF_8));
 			int distictWords = fillGlobalHashTableGetDistictWords(files, logs);
+			termContextRecordSize = distictWords * LONG_SIZE;
+			fillLongs(files, outputDirectory, logs, windowSize);
 			
+			logs.close();
 		} catch(Exception e) {
 			e.printStackTrace();
 		}
@@ -49,11 +57,13 @@ public class UAContext {
 					}
 				}
 				
+				in.close();
+				
 				for (String word : words.keySet()) {
 					if (gh.search(word) != null) {
 						gh.search(word).setCount(gh.search(word).getCount() + words.get(word));
 					} else {
-						gh.insert(new UARecord(word, words.get(word), 0));
+						gh.insert(new UARecord(word, words.get(word), 0, termId));
 						termId++;
 					}
 				}
@@ -63,6 +73,27 @@ public class UAContext {
 		}
 		
 		return termId;
+	}
+	
+	private void fillLongs(File[] files, String outputDirectory, BufferedWriter logs, int windowSize) throws IOException {
+		
+	}
+	
+	private void makeRAFFile(String outputDirectory) throws IOException {
+		try {
+			RandomAccessFile longs = new RandomAccessFile(outputDirectory + "/longs.raf", "rw");
+			RandomAccessFile dict = new RandomAccessFile(outputDirectory + "/dict.raf", "rw");
+			UARecord[] records = gh.getTable();
+			
+			for (int i = 0; i < records.length; i++) {
+				
+			}
+			
+			longs.close();
+			dict.close();
+		} catch(Exception e) {
+			e.printStackTrace();
+		}
 	}
 
 }

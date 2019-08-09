@@ -7,10 +7,11 @@ public class UARecord {
 	private float ppmi;
 	private int position;
 	
-	public UARecord(String word, long count, float ppmi) {
+	public UARecord(String word, long count, float ppmi, int position) {
 		this.word = word;
 		this.count = count;
 		this.ppmi = ppmi;
+		this.position = position;
 	}
 	
 	public String getWord() {
