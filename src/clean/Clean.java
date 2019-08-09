@@ -173,11 +173,12 @@ public class Clean {
 
           for(File z : zDir) {
 
-            tmp = new File(outDir.getPath()+"/"+f.getName());
-            tmp.mkdirs();
+            //tmp = new File(outDir.getPath()+"/"+f.getName());
+            //tmp.mkdirs();
 
             br = new BufferedReader(new FileReader(z));
-            bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+z.getName()));
+            //bw = new BufferedWriter(new FileWriter(tmp.getPath()+"/"+z.getName()));
+            bw = new BufferedWriter(new FileWriter(outDir.getPath()+"/"+z.getName()));
 
             thisDoc = new HashMap<>(100000);
             terms = new LinkedList<>();
