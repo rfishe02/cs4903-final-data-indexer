@@ -5,6 +5,7 @@ public class UARecord {
 	private String word;
 	private long count;
 	private float ppmi;
+	private int position;
 	
 	public UARecord(String word, long count, float ppmi) {
 		this.word = word;
@@ -34,6 +35,14 @@ public class UARecord {
 	
 	public void setPpmi(float ppmi) {
 		this.ppmi = ppmi;
+	}
+	
+	public int getPosition() {
+		return position;
+	}
+	
+	public void setPosition(int position) {
+		this.position = position;
 	}
 	
 	public int hashCode() {
