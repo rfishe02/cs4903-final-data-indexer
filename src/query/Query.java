@@ -157,13 +157,13 @@ public class Query {
 
     } // Finding an intersection of documents.
 
-    File[] result = new File[size];
+    File[] result = new File[intersect.size()];
     int x = 0;
     for (Map.Entry<Integer,Integer> entry : intersect.entrySet()) {
       if(entry.getValue() >= size) {
 
         map.seek(entry.getKey() * (MAP_LEN + 2));
-        result[x] = new File(inDir.getPath()+"/"+map.readUTF());
+        result[x] = new File(inDir.getPath()+"/"+(map.readUTF()).trim());
         x++;
 
       }
