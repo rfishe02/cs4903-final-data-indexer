@@ -17,13 +17,13 @@ import java.nio.charset.*;
 /** A class that builds an inverted index from a directory of tokenized files.
 Each file must have a single token on each line. */
 
-public class UAInvertedIndex {
+public class InvertedIndex {
   static final String NA = "NULL";
   static final int DOCID_LEN = 8;
   static final int STR_LEN = 8;
   static final int MAP_LEN = 25;
   static GlobalMap gh;
-  static int seed = 5000000;
+  static int seed = 30000000;
   static final int RTF_LEN = 8; //0.029304
 
   /**
