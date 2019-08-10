@@ -1,5 +1,5 @@
 
-package src.main.java;
+//package src.main.java;
 
 /********************************
 Name: Renae Fisher
@@ -20,7 +20,7 @@ import java.nio.charset.*;
 
 /** The class UAQuery, a non-executable class, is executed by the web interface and the UAQueryTest class. */
 
-public class UAQuery {
+public class Query {
   String NA;
   int size;
   int STR_LEN;
@@ -38,6 +38,7 @@ public class UAQuery {
   */
 
   public Query(File rafDir, String filename) {
+
     try {
         RandomAccessFile stat = new RandomAccessFile(rafDir.getPath()+"/"+filename,"r");
         stat.seek(0);
@@ -71,19 +72,25 @@ public class UAQuery {
       HashMap<String,Integer> termMap = new HashMap<String,Integer>(10000000);
       HashMap<String,Integer> q = new HashMap<String,Integer>(50);
 
-      PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+      PriorityQueue<Term> pq = getQueue(rafDir,query); // Create a priority queue that ranks documents by count.
+      File[] list = getIntersect(rafDir, inDir, pq);
 
-      for(String s : query) {
-        pq.add( new Term(s,) );
-      }
+      // We may build the term-context matrix at this point.
+      // We could build a TDM to limit documents.
 
-      mapRowsCols(inDir,rafDir,termMap,docMap,q,query);
+      /*
+      mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
       if(termMap.size() > 0 && docMap.size() > 0) {
         float[][] tdm = buildTDM(rafDir,termMap,docMap,q,Math.min(query.length,limit));
         result = getDocs(rafDir,docMap,tdm,10);
       } else {
         System.out.println("No results found.");
-      }
+      }*/
+
+      Semantic s = new Semantic();
+      HashMap<String,Integer> vocab = s.getVocab(list);
+      float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
+      String[] res = s.getContext(vocab,tcm,5,vocab.get("cat")); // Testing in memory query.
 
     } catch(IOException ex) {
       ex.printStackTrace();
@@ -93,14 +100,15 @@ public class UAQuery {
     return result;
   }
 
-  public PriorityQueue<Term> getQueue(String[] query) {
-
+  public PriorityQueue<Term> getQueue(File rafDir, String[] query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+    String record;
     int i;
     int count;
+    int start;
 
-    for(int i = 0; i < query.length; i++) {
+    for(int a = 0; a < query.length; a++) {
 
       i = 0;  // Find the term in the dictionary.
       do {
@@ -109,11 +117,10 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
 
-      if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0 ) {
-
+      if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0 ) {
         count = dict.readInt();
-        
-
+        start = dict.readInt();
+        pq.add( new Term(query[a],count,start) ); // Order terms by number of documents.
       }
 
     }
@@ -121,6 +128,65 @@ public class UAQuery {
     dict.close();
     return pq;
   }
+
+  public File[] getIntersect(File rafDir, File inDir, PriorityQueue<Term> pq) throws IOException {
+    RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
+    RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
+    HashMap<Integer,Integer> intersect = new HashMap<>();
+    Term query;
+    int docID;
+    int size;
+
+    size = pq.size();
+
+    while(!pq.isEmpty()) {
+      query = pq.remove();
+
+      post.seek( query.start * POST_LEN );
+      for(int x = 0; x < query.count; x++) {
+
+        docID = post.readInt();
+        post.readFloat();
+
+        if(intersect.containsKey(docID)) {
+          intersect.put(docID,intersect.get(docID)+1); // Count the number of times we see the document.
+        } else {
+          intersect.put(docID,1);
+        }
+
+      } // Read each posting for the term.
+
+    } // Finding an intersection of documents.
+
+    File[] result = new File[intersect.size()];
+    int x = 0;
+    for (Map.Entry<Integer,Integer> entry : intersect.entrySet()) {
+      if(entry.getValue() >= size) {
+
+        map.seek(entry.getKey() * (MAP_LEN + 2));
+        result[x] = new File(inDir.getPath()+"/"+(map.readUTF()).trim());
+        x++;
+
+      }
+    }
+
+    post.close();
+    map.close();
+    return result;
+  }
+
+  /** The same hash function used to construct the global hash table.
+  @param str A term of interest.
+  @param i An index.
+  @param n The size of the hash table.
+  @return A hashcode for a given String.
+  */
+
+  public int hash(String str, int i, int n) {
+    return ( Math.abs(str.hashCode()) + i ) % n;
+  } // h(k,i) = (h'(k) + i) mod m
+
+  /** */
 
   static class TermComparator implements Comparator<Term> {
     public int compare(Term o1, Term o2) {
@@ -134,6 +200,73 @@ public class UAQuery {
     }
   }
 
+  /** A function used to normalize a String, which uses the same techniques used in the
+  tokenization phase. It iterates over characters and converts non-ASCII characters to a
+  one byte character.
+  @param s An input String.
+  @param limit The desired length of a the resulting String.
+  @return A normalized String.
+  */
+
+  /* Substitute this method with the Tokenizer used to create the tokens for this project.
+    (Create a method that could accept the String and return a list.)
+  */
+
+  public String convertText(String s, int limit) {
+    String out = "";
+    int len;
+
+    len = Math.min(s.length(),limit);
+
+    for(int i = 0; i < len; i++) {
+        if((int)s.charAt(i) > 127) {
+            out += "?";
+        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
+            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
+            out += s.charAt(i);
+        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
+            out += (char)((int)s.charAt(i) + 32);
+        }
+    }
+
+    if(out.length() > 7) {
+      out = out.substring(0,8);
+    }
+
+    return out;
+  }
+
+  //============================================================================
+  // UNUSED METHODS
+  //============================================================================
+
+  /** A class used as the Comparator for the PriorityQueue in the getDocs method. */
+
+  static class ResultComparator implements Comparator<Result> {
+    public int compare(Result s1, Result s2) {
+      if(s1.score > s2.score) {
+        return -1;
+      } else if(s1.score < s2.score) {
+        return 1;
+      } else {
+        return 0;        }
+    }
+  }
+
+  /** A class that stores results for the getDocs method. */
+
+  static class Result {
+    String name;
+    float score;
+    int id;
+
+    public Result(String name, int id, float score) {
+      this.name = name;
+      this.id = id;
+      this.score = score;
+    }
+  }
+
   /** Uses the query array and random access files to map terms and document IDs to rows and columns.
   This information will be used to build the term document matrix.
   @param inDir The directory of tokenized files that UAInvertedIndex used to build the inverted index.
@@ -144,7 +277,7 @@ public class UAQuery {
   @param query A query as an array of words.
   */
 
-  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> q, PriorityQueue<Term> query) throws IOException {
+  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> qMap, String[] query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
     RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
@@ -163,18 +296,15 @@ public class UAQuery {
     int end = Math.min(query.length,limit);
     for(int a = 0; a < end; a++) {
 
-      query[a] = convertText(query[a],STR_LEN);
-
       if(!termMap.containsKey(query[a])) {
         termMap.put(query[a],row);
         row++;
       } // Map terms to rows.
-       if(q.containsKey(query[a])) {
-        q.put(query[a],q.get(query[a])+1);
+       if(qMap.containsKey(query[a])) {
+        qMap.put(query[a],qMap.get(query[a])+1);
       } else {
-        q.put(query[a],1);
+        qMap.put(query[a],1);
       }  // Count the frequency of terms in the query.
-
 
       i = 0;  // Find the term in the dictionary.
       do {
@@ -183,12 +313,12 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
 
-      if(record.trim().compareToIgnoreCase(NA) != 0) {
+      if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0) {
 
         count = dict.readInt();
         start = dict.readInt();
 
-        post.seek(( (start+1)-count ) * POST_LEN);
+        post.seek(start * POST_LEN);
         for(int x = 0; x < count; x++) {
 
           docID = post.readInt();
@@ -200,12 +330,10 @@ public class UAQuery {
               col++;
             } // Map document ID to a column.
 
-
             map.seek(docID * (MAP_LEN + 2));
             br = new BufferedReader(new InputStreamReader(new FileInputStream( inDir.getPath()+"/"+map.readUTF().trim() ), "UTF8"));
 
             while((read=br.readLine())!=null) {
-              read = convertText(read,STR_LEN);
 
               if(!termMap.containsKey(read)) {
                 termMap.put(read,row);
@@ -257,12 +385,12 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) != 0);
 
-      if(record.trim().compareToIgnoreCase(NA) != 0) {
+      if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) == 0) {
 
         count = dict.readInt();
         start = dict.readInt();
 
-        post.seek(( (start+1)-count ) * POST_LEN);
+        post.seek( start * POST_LEN );
         for(int x = 0; x < count; x++) {
           docID = post.readInt(); // Acquire document IDs.
           rtfIDF = post.readFloat();
@@ -339,90 +467,5 @@ public class UAQuery {
 
     return (float)( (tot) / (Math.sqrt(one) * Math.sqrt(two)) );
   }
-
-  /** The same hash function used to construct the global hash table.
-  @param str A term of interest.
-  @param i An index.
-  @param n The size of the hash table.
-  @return A hashcode for a given String.
-  */
-
-  public int hash(String str, int i, int n) {
-    return ( Math.abs(str.hashCode()) + i ) % n;
-  } // h(k,i) = (h'(k) + i) mod m
-
-  /** A function used to normalize a String, which uses the same techniques used in the
-  tokenization phase. It iterates over characters and converts non-ASCII characters to a
-  one byte character.
-  @param s An input String.
-  @param limit The desired length of a the resulting String.
-  @return A normalized String.
-  */
-
-  /* Substitute this method with the Tokenizer used to create the tokens for this project.
-    (Create a method that could accept the String and return a list.)
-  */
-
-  public String convertText(String s, int limit) {
-    String out = "";
-    int len;
-
-    len = Math.min(s.length(),limit);
-
-    for(int i = 0; i < len; i++) {
-        if((int)s.charAt(i) > 127) {
-            out += "?";
-        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
-            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
-            out += s.charAt(i);
-        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
-            out += (char)((int)s.charAt(i) + 32);
-        }
-    }
-
-    if(out.length() > 7) {
-      out = out.substring(0,8);
-    }
-
-    return out;
-  }
-
-  /** A class that stores results for the getDocs method. */
-
-  static class Result {
-    String name;
-    float score;
-    int id;
-
-    public Result(String name, int id, float score) {
-      this.name = name;
-      this.id = id;
-      this.score = score;
-    }
-  }
-
-  /** A class used as the Comparator for the PriorityQueue in the getDocs method. */
-
-  static class ResultComparator implements Comparator<Result> {
-    public int compare(Result s1, Result s2) {
-      if(s1.score > s2.score) {
-        return -1;
-      } else if(s1.score < s2.score) {
-        return 1;
-      } else {
-        return 0;        }
-    }
-  }
-
-  /*
-  public void printTDM(float[][] tdm) {
-    for(int a = 0; a < tdm.length; a++) {
-      System.out.printf("[ %-3s ] ",a);
-      for(int b = 0; b < tdm[0].length; b++) {
-        System.out.printf("%-3.2f ",tdm[a][b]);
-      }
-      System.out.println();
-    }
-  }*/
 
 }

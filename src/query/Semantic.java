@@ -12,59 +12,10 @@ import java.util.Comparator;
 import java.util.TreeSet;
 import java.util.ArrayList;
 import java.util.PriorityQueue;
-
-import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
+import java.util.HashMap;
+import java.util.Map;
 
 public class Semantic {
-
-  /** The main method retreives the vocabulary. The vocabulary provides the size of the term-context matrix
-    and the index locations of all terms to other methods.
-    @param args Accepts the commands [filename], [window], [word1], and optionally [word2] from the command line.
-  */
-
-  public static void main(String[] args) {
-
-    long startMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-
-    try {
-      File[] files = new File(args[0]).listFiles();
-
-      ArrayList<String> vocab = getVocab(files);
-      float[][] tcm = buildTermContextMatrix(files,vocab,vocab.size(),Integer.parseInt(args[1]) );
-
-      int u = wordSearch(vocab, args[2]);
-
-      if(u < 0) {
-        System.out.println(args[2] +" not found in vocab.");
-      } else {
-
-          if(args.length < 4) {
-            System.out.println("query: top 10 context words -- " + args[2]);
-            getContext(vocab,tcm,10,u);
-          } else {
-
-            int v = wordSearch(vocab,args[3]);
-
-            if(v < 0) {
-              System.out.println(args[3] +" not found in vocab.");
-            } else {
-              System.out.println("query: similarity -- " + args[2] +" & "+ args[3]);
-              System.out.println(calculateSimilarity(tcm,u,v));
-            }
-
-          }
-      }
-
-    } catch(Exception ex) {
-        ex.printStackTrace();
-        System.exit(1);
-    }
-
-    long endMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-    System.out.println("end memory usage -- "+(endMemory/1000/1000/1000)+" GB");
-
-  }
 
   /** Pre-reads the file to obtain the vocabulary. It will be used to
     find the location of terms in the matrix.
@@ -78,30 +29,31 @@ public class Semantic {
     @return An array of terms arranged in alphabetic order.
   */
 
-  public static ArrayList<String> getVocab(File[] files) {
+  public HashMap<String,Integer> getVocab(File[] files) {
     System.out.println("building vocab");
-    ArrayList<String> vocab = null;
+    HashMap<String,Integer> vocab = new HashMap<>();
+    int col = 0;
 
     try {
-      TreeSet<String> set = new TreeSet<>(new VocabComparator());
       BufferedReader br;
       String read;
 
-      for(File f : files) {
+      for(int i = 0; i < files.length; i++) {
 
-        br = new BufferedReader(new FileReader(f));
-        while((read = br.readLine())!=null) {
-          set.add(read);
+        if(files[i] != null) {
+
+          br = new BufferedReader(new FileReader(files[i]));
+          while((read = br.readLine())!=null) {
+            if(!vocab.containsKey(read)) {
+              vocab.put(read,col);
+              col++;
+            }
+          }
+
+          br.close();
+
         }
 
-        br.close();
-      }
-
-      vocab = new ArrayList<>(set.size());
-
-      Iterator<String> it = set.iterator();
-      while(it.hasNext()) {
-        vocab.add(it.next());
       }
 
     } catch(IOException ex) {
@@ -114,7 +66,7 @@ public class Semantic {
 
   /** This method uses a directory of tokenized files to build a term-context matrix.
     It requires an ArrayList of strings arranged in alphabetic order (the vocabulary).
-    
+
     It packs these terms into segments, which countTerms uses to count contextual terms.
     After the term-context matrix is complete, the method weightTerms calculate the
     PPMI for each non-zero value.
@@ -125,7 +77,7 @@ public class Semantic {
     @return A complete term-context matrix.
   */
 
-  public static float[][] buildTermContextMatrix(File[] files, ArrayList<String> vocab, int size, int window) {
+  public float[][] buildTermContextMatrix(File[] files, HashMap<String,Integer> vocab, int size, int window) {
     BufferedReader br;
     String[] prev;
     String[] next;
@@ -139,37 +91,41 @@ public class Semantic {
 
     try {
 
-      for(File f : files) {
+      for(int a = 0; a < files.length; a++) {
 
-        prev = null;
-        next = new String[window];
-        i = 0;
+        if(files[a] != null) {
 
-        br = new BufferedReader(new FileReader(f));
-        while((read=br.readLine())!=null) {
-          next[i] = read;
-          i++;
+          prev = null;
+          next = new String[window];
+          i = 0;
 
-          if(i == window) {
+          br = new BufferedReader(new FileReader(files[a]));
+          while((read=br.readLine())!=null) {
+            next[i] = read;
+            i++;
 
-            if(prev != null) {
-              countTerms(vocab,tcm,sum,prev,next,window,i); // Begin to count overlapping terms.
+            if(i == window) {
+
+              if(prev != null) {
+                countTerms(vocab,tcm,sum,prev,next,window,i); // Begin to count overlapping terms.
+              }
+
+              i = 0;
+              prev = next;
+              next = new String[window];
             }
 
-            i = 0;
-            prev = next;
-            next = new String[window];
           }
 
+          countTerms(vocab,tcm,sum,prev,next,window,i);
+
+          if(prev != null && i < window) {
+            countTerms(vocab,tcm,sum,null,next,window,i);
+          } // The case where there are leftover terms.
+
+          br.close();
+
         }
-
-        countTerms(vocab,tcm,sum,prev,next,window,i);
-
-        if(prev != null && i < window) {
-          countTerms(vocab,tcm,sum,null,next,window,i);
-        } // The case where there are leftover terms.
-
-        br.close();
 
       }
 
@@ -198,7 +154,7 @@ public class Semantic {
     @param nLim The limit used when a null value is passed through prev.
   */
 
-  public static void countTerms(ArrayList<String> vocab, float[][] tcm, int[] sum, String[] prev, String[] next, int pLim, int nLim) {
+  public void countTerms(HashMap<String,Integer> vocab, float[][] tcm, int[] sum, String[] prev, String[] next, int pLim, int nLim) {
     String[] comp = (prev == null) ? next : prev;
     int lim = (prev == null) ? nLim : pLim ;
     int off = 0;
@@ -207,12 +163,12 @@ public class Semantic {
       for(int in = 0; in < lim-out; in++) {
 
         if(in < lim-(out+1)) {
-          addFreq(tcm,sum, wordSearch(vocab, comp[in]), wordSearch(vocab, comp[in+(out+1)]) );
+          addFreq(tcm,sum, vocab.get(comp[in]), vocab.get(comp[in+(out+1)]) );
           //System.out.println(comp[in]+": "+in+"    "+comp[in+(out+1)]+": "+(in+(out+1)));
         }
 
         if(prev != null && comp[in+off] != null && next[out] != null) {
-          addFreq(tcm,sum, wordSearch(vocab, comp[in+off]), wordSearch(vocab, next[out]) );
+          addFreq(tcm,sum, vocab.get(comp[in+off]), vocab.get(next[out]));
           //System.out.println(comp[(in+off)]+": "+(in+off)+"    "+comp[out]+": "+out);
         } // If prev is null, do not count overlapping terms.
 
@@ -228,7 +184,7 @@ public class Semantic {
   @param w2 The index of the second word.
   */
 
-  public static void addFreq(float[][] tcm, int[] sum, int w1, int w2) {
+  public void addFreq(float[][] tcm, int[] sum, int w1, int w2) {
     tcm[ w1 ][ w2 ] ++ ;
     tcm[ w2 ][ w1 ] ++ ;
     sum[ w1 + 1 ] ++; // Count sum, which is used to weight terms.
@@ -236,43 +192,12 @@ public class Semantic {
     sum[0] += 2;
   }
 
-  /** Uses a binary search to find the reference to a column for a given term.
-    This is an attempt to avoid using a HashMap to map Strings to indices.
-    However, it takes logarithmic time rather than constant time.
-
-    The method returns the index of the String as the column reference.
-    @param vocab A array that holds the vocabulary for the term-context matrix.
-    @param target The desired term in the vocabulary.
-    @return The index for a term in the term-context matrix.
-  */
-
-  public static int wordSearch(ArrayList<String> vocab, String target) {
-    int ind = -1;
-    int l = 0;
-    int m;
-    int r = vocab.size()-1;
-
-    while(l <= r) {
-      m = (l+r)/2;
-
-      if(target.compareTo(vocab.get(m)) > 0) {
-        l = m+1;
-      } else if(target.compareTo(vocab.get(m)) < 0) {
-        r = m-1;
-      } else {
-        return m;
-      }
-
-    }
-    return ind;
-  }
-
   /** Uses PPMI to weight all values in the term-context matrix.
     @param tcm A complete term-context matrix.
     @param sum An array of aggregated frequencies from the term-context matrix.
   */
 
-  public static void weightTerms(float[][] tcm, int[] sum) {
+  public void weightTerms(float[][] tcm, int[] sum) {
     System.out.println("applying weights to frequencies");
 
     double e = Math.pow(sum[0],0.75);
@@ -302,7 +227,7 @@ public class Semantic {
     @return The value PPMI.
   */
 
-  public static double getV(float a, double b, float c, int d, double e) {
+  public double getV(float a, double b, float c, int d, double e) {
     double v = ( (double) a / d )
                / ( (b / d) * ( Math.pow( c,0.75 ) / e ) );
 
@@ -323,7 +248,7 @@ public class Semantic {
     @return The value PPMI.
   */
 
-  public static double getV2(float a, float b, float c, double e) {
+  public double getV2(float a, float b, float c, double e) {
     double v = (double)a / ( b * ( Math.pow( c,0.75 ) / e ) );
 
     if(v > 0.00001) {
@@ -341,7 +266,7 @@ public class Semantic {
     @return The value cosine similarity.
   */
 
-  public static float calculateSimilarity( float[][] tcm, int u, int v ) {
+  public float calculateSimilarity( float[][] tcm, int u, int v ) {
     double one = 0.0;
     double two = 0.0;
     double tot = 0.0;
@@ -365,16 +290,20 @@ public class Semantic {
     @return A list of the top k context words.
   */
 
-  public static String[] getContext(ArrayList<String> vocab, float[][] tcm, int k, int u) {
+  public String[] getContext(HashMap<String,Integer> vocab, float[][] tcm, int k, int u) {
     System.out.println("searching for context");
 
     PriorityQueue<Result> pq = new PriorityQueue<>(new ResultComparator());
     String[] res = new String[k];
 
-    for(int i = 0; i < tcm.length; i++) {
-      if(i != u) {
-        pq.add(new Result( calculateSimilarity(tcm,u,i), vocab.get(i) ));
+    for ( Map.Entry<String,Integer> entry : vocab.entrySet() ) {
+
+      if(entry.getValue() != u) {
+
+        pq.add( new Result( calculateSimilarity(tcm,u,entry.getValue()), entry.getKey() ) );
+
       }
+
     }
 
     int j = 0;
@@ -385,22 +314,6 @@ public class Semantic {
     }
 
     return res;
-  }
-
-  /** A simple method that uses pre-processing steps on an input String.
-  @param stem A class that is capable of stemming.
-  @param str An input String.
-  @return A processed String.
-  */
-
-  public static String formatString(Stemmer stem, String str) {
-    str = stem.stemString(str);
-
-    if(str.length() > 7) {
-      str = str.substring(0,8);
-    }
-
-    return str;
   }
 
   /** The TreeMap in getVocab uses this class to arrange terms in alphabetic order. */
@@ -439,7 +352,7 @@ public class Semantic {
 
   //--------------------------------------------------------
 
-  public static void printContextMatrix(ArrayList<String> vocab, float[][] matrix) {
+  public void printContextMatrix(ArrayList<String> vocab, float[][] matrix) {
     System.out.printf("%10s ","");
     for(String s : vocab) {
       System.out.printf("%8s ",s);
@@ -464,7 +377,7 @@ public class Semantic {
     }
   }
 
-  public static void printSums(ArrayList<String> vocab, float[][] tcm, int[] sum) {
+  public void printSums(ArrayList<String> vocab, float[][] tcm, int[] sum) {
     for(int i = 0; i < vocab.size(); i++) {
 
       for(int j = 0; j < vocab.size(); j++) {
@@ -476,39 +389,5 @@ public class Semantic {
       System.out.println();
     }
   }
-
-  /*
-  public void writeTCM(TCM tcm, String filename) {
-    try {
-      FileOutputStream file = new FileOutputStream(filename);
-      ObjectOutputStream out = new ObjectOutputStream(file);
-
-      out.writeObject(tcm);
-      out.close();
-      file.close();
-
-    } catch(IOException ex) {
-       ex.printStackTrace();
-       System.exit(1);
-    }
-  }
-
-  public TCM loadTCM(String filename) {
-    TCM tcm = null;
-
-    try {
-      FileInputStream file = new FileInputStream(filename);
-      ObjectInputStream in = new ObjectInputStream(file);
-
-      tcm = (TCM)in.readObject();
-      in.close();
-      file.close();
-
-    } catch(Exception ex) {
-        ex.printStackTrace();
-        System.exit(1);
-    }
-    return tcm;
-  }*/
 
 }

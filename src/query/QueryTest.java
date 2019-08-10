@@ -2,12 +2,27 @@
 import java.util.Queue;
 import java.util.PriorityQueue;
 import java.util.Comparator;
-
+import java.io.*;
 
 public class QueryTest {
 
-  public static void main(String[] args) {
+  public static void main(String[] args) throws IOException {
 
+    File rafDir = new File(args[0]);
+    File inDir = new File(args[1]); //new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean")
+
+    String[] query = new String[args.length-2];
+
+    int a = 0;
+    for(int i = 2; i < args.length; i++) {
+      query[a] = args[i];
+      a++;
+    }
+
+    Query q = new Query(rafDir,"stats.raf");
+    String[] res = q.runQuery( inDir, rafDir, query );
+
+    /*
     String[] query = {"one","two","three","four","five"};
     PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
 
@@ -19,7 +34,30 @@ public class QueryTest {
 
     while(!pq.isEmpty()) {
       System.out.println(pq.remove().count);
-    }
+    }*/
+
+    /*
+    File rafDir = new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index");
+    File inDir = new File("C:/Users/fishe/Documents/GitHub/4903-final-data/output/clean");
+
+    String[] query = {"cat","toy"};
+
+    Query q = new Query(rafDir,"stats.raf");
+    String[] res = q.runQuery( new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean"), rafDir, query );
+    */
+
+    /*
+    for(String s : res) {
+      System.out.println(res);
+    }*/
+
+    //PriorityQueue<Term> pq = q.getQueue(rafDir,query);
+    /*
+    while(!pq.isEmpty()) {
+      System.out.println(pq.remove().count);
+    }*/
+
+    //q.getIntersect(rafDir,inDir,pq);
 
   }
 
