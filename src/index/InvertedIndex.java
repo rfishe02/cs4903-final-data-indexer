@@ -13,6 +13,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Comparator;
 import java.nio.charset.*;
+import java.util.PriorityQueue;
 
 /** A class that builds an inverted index from a directory of tokenized files.
 Each file must have a single token on each line. */
@@ -21,7 +22,7 @@ public class InvertedIndex {
   static final String NA = "NULL";
   static final int DOCID_LEN = 8;
   static final int STR_LEN = 8;
-  static final int MAP_LEN = 25;
+  static int MAP_LEN = 25;
   static GlobalMap gh;
   static int seed = 30000000;
   static final int RTF_LEN = 8; //0.029304
@@ -31,6 +32,12 @@ public class InvertedIndex {
   */
 
   public static void main(String[] args) {
+
+    seed = 1000;
+    MAP_LEN = 100;
+    args = new String[2];
+    args[0] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean";
+    args[1] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index";
 
     if(args == null || args.length < 2) {
 
@@ -188,6 +195,29 @@ public class InvertedIndex {
   @param size The total number of documents.
   */
 
+  static class StringComparator implements Comparator<String> {
+
+    public int compare(String s1, String s2) {
+
+      if( s1.substring(0,STR_LEN).compareTo(s2.substring(0,STR_LEN)) < 0 ) {
+        return -1;
+      } else {
+        if( s1.substring(0,STR_LEN).compareTo(s2.substring(0,STR_LEN)) == 0 ) {
+
+          if( Integer.parseInt(s1.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) < Integer.parseInt(s2.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) ) {
+            return -1;
+          } else {
+            return 0;
+          }
+
+        } else {
+          return 1;
+        }
+      } // If the two are similiar, compare the document IDs.
+
+    }
+  }
+
   public static void algoTwo(File inDir, File outDir, int size) {
     System.out.println("running second pass.");
 
@@ -211,58 +241,22 @@ public class InvertedIndex {
       RandomAccessFile post = new RandomAccessFile(outDir.getPath()+"/post.raf","rw"); // Create & open a new file for postings, post.raf .
       post.seek(0);
 
-      /*
-      Consider using a data structure, such as a priority queue, to improve the runtime of this algorithm.
-      */
-
-      while(nullCount < br.length) {
+      PriorityQueue<String> pq = new PriorityQueue<>( new StringComparator() );
+      while(!pq.isEmpty() || nullCount < br.length) {
         nullCount = 0;
-        br[topInd].mark(100);
-        top = br[topInd].readLine();
 
-        for(int b = 0; b < br.length; b++) {
+        for(BufferedReader b : br) {
 
-          if(b != topInd) {
-
-            br[b].mark(100);
-
-            if(top == null) {
-              br[topInd].mark(100);
-              nullCount++;
-
-              top = br[b].readLine();
-              topInd = b;
-
-            } else if( (read = br[b].readLine()) != null ) {
-
-              if( read.substring(0,STR_LEN).compareTo(top.substring(0,STR_LEN)) < 0 ) {
-                br[topInd].reset();
-                top = read;
-                topInd = b;
-              } else {
-                if( read.substring(0,STR_LEN).compareTo(top.substring(0,STR_LEN)) == 0 ) {
-
-                  if( Integer.parseInt(read.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) < Integer.parseInt(top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) ) {
-                    br[topInd].reset();
-                    top = read;
-                    topInd = b;
-                  } else {
-                    br[b].reset();
-                  }
-
-                } else {
-                  br[b].reset();
-                }
-              } // If the two are similiar, compare the document IDs.
-
-            } else {
-              br[b].mark(100);
-              nullCount++;
-            }
-
+          read = b.readLine();
+          if(read == null) {
+            nullCount++;
+          } else {
+            pq.add(read);
           }
-        } // find token that is alphabetically first in the buffer.
 
+        }
+
+        top = pq.remove();
         //System.out.println(top.substring(0,STR_LEN).trim());
 
         t = gh.get( top.substring(0,STR_LEN).trim() );
@@ -270,15 +264,15 @@ public class InvertedIndex {
         rtf = (float) Double.parseDouble( top.substring( (STR_LEN+1 + DOCID_LEN), top.length() ) );
         idf = (float) Math.log( (double) size / t.getCount() ); // Calculate inverse document frequency for term from gh(t).numberOfDocuments .
 
-        t.setStart(recordCount);  // Update the start field for the token in the global hash table. ** FIX THIS, IT SHOULD HAPPEN ONCE PER TERM. **
-        //gh.put( t );
+        if(t.getStart() == -9) {
+          t.setStart(recordCount);  // Update the start field for the token in the global hash table. ** FIX THIS, IT SHOULD HAPPEN ONCE PER TERM. **
+        }
 
         post.writeInt( Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ) ); // Write postings record for the token (documentID, termFrequency, OR rtf * idf) .
         post.writeFloat( rtf * idf );
 
         recordCount = recordCount + 1;
-
-      } // While all postings haven't been written do this.
+      }
 
       post.close();
 

@@ -17,6 +17,8 @@ public class Clean {
   static String most = null;
   static int max = 0;
 
+  static int limit = 2;
+
   public static void main(String[] args) {
 
     /*
@@ -210,7 +212,7 @@ public class Clean {
 
               if(!stopwords.contains(temp)) {
 
-                if( idf > 3 && allDoc.get(temp) > 30 ) {
+                if( temp.length() > limit && idf > 3 && allDoc.get(temp) > 30 ) {
 
                   bw.write(temp+"\n");
 
@@ -261,7 +263,7 @@ public class Clean {
 
             if(!stopwords.contains(temp)) {
 
-              if( idf > 2 && thisDoc.get(temp) > 1 && allDoc.get(temp) > 20 ) {
+              if( temp.length() > limit && idf > 3 && allDoc.get(temp) > 30 ) {
 
                 bw.write(temp+"\n");
 

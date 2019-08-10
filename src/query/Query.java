@@ -1,5 +1,5 @@
 
-package src.main.java;
+//package src.main.java;
 
 /********************************
 Name: Renae Fisher
@@ -20,7 +20,7 @@ import java.nio.charset.*;
 
 /** The class UAQuery, a non-executable class, is executed by the web interface and the UAQueryTest class. */
 
-public class UAQuery {
+public class Query {
   String NA;
   int size;
   int STR_LEN;
@@ -38,6 +38,7 @@ public class UAQuery {
   */
 
   public Query(File rafDir, String filename) {
+
     try {
         RandomAccessFile stat = new RandomAccessFile(rafDir.getPath()+"/"+filename,"r");
         stat.seek(0);
@@ -71,13 +72,14 @@ public class UAQuery {
       HashMap<String,Integer> termMap = new HashMap<String,Integer>(10000000);
       HashMap<String,Integer> q = new HashMap<String,Integer>(50);
 
-      PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+      PriorityQueue<Term> pq = getQueue(rafDir,query); // Create a priority queue that ranks documents by count.
+      mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
 
-      for(String s : query) {
-        pq.add( new Term(s,) );
-      }
+      // We may build the term-context matrix at this point.
 
-      mapRowsCols(inDir,rafDir,termMap,docMap,q,query);
+
+
+
       if(termMap.size() > 0 && docMap.size() > 0) {
         float[][] tdm = buildTDM(rafDir,termMap,docMap,q,Math.min(query.length,limit));
         result = getDocs(rafDir,docMap,tdm,10);
@@ -93,26 +95,27 @@ public class UAQuery {
     return result;
   }
 
-  public PriorityQueue<Term> getQueue(String[] query) {
-
+  public PriorityQueue<Term> getQueue(File rafDir, String[] query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+    String record;
     int i;
     int count;
 
-    for(int i = 0; i < query.length; i++) {
+    for(int a = 0; a < query.length; a++) {
 
       i = 0;  // Find the term in the dictionary.
       do {
         dict.seek( hash(query[a],i,seed) * (DICT_LEN + 2) );
         record = dict.readUTF();
         i++;
+
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
 
-      if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0 ) {
+      if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0 ) {
 
         count = dict.readInt();
-        
+        pq.add( new Term(query[a],count,dict.readInt()) ); // Order terms by number of documents.
 
       }
 
@@ -134,6 +137,42 @@ public class UAQuery {
     }
   }
 
+  public File[] getIntersect(File rafDir, PriorityQueue<Term> pq) throws IOException {
+    RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
+    HashMap<Integer,Integer> intersect = new HashMap<>();
+    Term query;
+    int docID;
+    int size;
+
+    size = pq.size();
+
+    while(!pq.isEmpty()) {
+      query = pq.remove();
+
+      post.seek( query.start * POST_LEN );
+      for(int x = 0; x < query.count; x++) {
+
+        docID = post.readInt();
+
+        if(intersect.containsKey(docID)) {
+          intersect.put(docID,intersect.get(docID)+1); // Count the number of times we see the document.
+        } else {
+          intersect.put(docID,1);
+        }
+
+      } // Read each posting for the term.
+
+    } // Finding an intersection of documents.
+
+    for (Map.Entry<Integer,Integer> entry : intersect.entrySet()) {
+      if(entry.getValue() >= size) {
+        System.out.println(entry.getKey());
+      }
+    }
+
+    return null;
+  }
+
   /** Uses the query array and random access files to map terms and document IDs to rows and columns.
   This information will be used to build the term document matrix.
   @param inDir The directory of tokenized files that UAInvertedIndex used to build the inverted index.
@@ -144,7 +183,7 @@ public class UAQuery {
   @param query A query as an array of words.
   */
 
-  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> q, PriorityQueue<Term> query) throws IOException {
+  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> qMap, String[] query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
     RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
@@ -163,18 +202,15 @@ public class UAQuery {
     int end = Math.min(query.length,limit);
     for(int a = 0; a < end; a++) {
 
-      query[a] = convertText(query[a],STR_LEN);
-
       if(!termMap.containsKey(query[a])) {
         termMap.put(query[a],row);
         row++;
       } // Map terms to rows.
-       if(q.containsKey(query[a])) {
-        q.put(query[a],q.get(query[a])+1);
+       if(qMap.containsKey(query[a])) {
+        qMap.put(query[a],qMap.get(query[a])+1);
       } else {
-        q.put(query[a],1);
+        qMap.put(query[a],1);
       }  // Count the frequency of terms in the query.
-
 
       i = 0;  // Find the term in the dictionary.
       do {
@@ -183,12 +219,12 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
 
-      if(record.trim().compareToIgnoreCase(NA) != 0) {
+      if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0) {
 
         count = dict.readInt();
         start = dict.readInt();
 
-        post.seek(( (start+1)-count ) * POST_LEN);
+        post.seek(start * POST_LEN);
         for(int x = 0; x < count; x++) {
 
           docID = post.readInt();
@@ -200,12 +236,10 @@ public class UAQuery {
               col++;
             } // Map document ID to a column.
 
-
             map.seek(docID * (MAP_LEN + 2));
             br = new BufferedReader(new InputStreamReader(new FileInputStream( inDir.getPath()+"/"+map.readUTF().trim() ), "UTF8"));
 
             while((read=br.readLine())!=null) {
-              read = convertText(read,STR_LEN);
 
               if(!termMap.containsKey(read)) {
                 termMap.put(read,row);
@@ -257,12 +291,14 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) != 0);
 
-      if(record.trim().compareToIgnoreCase(NA) != 0) {
+      if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) == 0) {
 
         count = dict.readInt();
         start = dict.readInt();
 
-        post.seek(( (start+1)-count ) * POST_LEN);
+        System.out.println(record+" "+start);
+
+        post.seek( start * POST_LEN );
         for(int x = 0; x < count; x++) {
           docID = post.readInt(); // Acquire document IDs.
           rtfIDF = post.readFloat();
@@ -363,6 +399,7 @@ public class UAQuery {
     (Create a method that could accept the String and return a list.)
   */
 
+  /*
   public String convertText(String s, int limit) {
     String out = "";
     int len;
@@ -385,7 +422,7 @@ public class UAQuery {
     }
 
     return out;
-  }
+  }*/
 
   /** A class that stores results for the getDocs method. */
 
