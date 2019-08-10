@@ -26,6 +26,7 @@ public class InvertedIndex {
   static GlobalMap gh;
   static int seed = 30000000;
   static final int RTF_LEN = 8; //0.029304
+  static final int recLimit = 100;
 
   /**
   @param args Accepts the following arugments from the command line: [input tokenized files] [output for random access files].
@@ -205,11 +206,11 @@ public class InvertedIndex {
       } else {
         if( s1.substring(0,STR_LEN).compareTo(s2.substring(0,STR_LEN)) == 0 ) {
 
-          if( Integer.parseInt(s1.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) < Integer.parseInt(s2.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim()) ) {
-            return -1;
+          if( Double.parseDouble( s1.substring( (STR_LEN+1 + DOCID_LEN), s1.length() ) ) < Double.parseDouble( s2.substring( (STR_LEN+1 + DOCID_LEN), s2.length() ) ) ) {
+            return 1;
           } else {
-            return 0;
-          }
+            return -1;
+          } // Compare by rtfidf value.
 
         } else {
           return 1;
@@ -255,21 +256,27 @@ public class InvertedIndex {
         }
 
         top = pq.remove();
-        //System.out.println(top.substring(0,STR_LEN).trim() + " " + Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ));
+        //System.out.println(top.substring(0,STR_LEN).trim() + " " + (float)Double.parseDouble( top.substring( (STR_LEN+1 + DOCID_LEN), top.length() ) ) );
 
         t = gh.get( top.substring(0,STR_LEN).trim() );
 
-        rtf = (float) Double.parseDouble( top.substring( (STR_LEN+1 + DOCID_LEN), top.length() ) );
-        idf = (float) Math.log( (double) size / t.getCount() ); // Calculate inverse document frequency for term from gh(t).numberOfDocuments .
+        if( t.getRecCount() < recLimit ) {
 
-        if(t.getStart() == -9) {
-          t.setStart(recordCount);  // Update the start field for the token in the global hash table.
-        }
+          rtf = (float) Double.parseDouble( top.substring( (STR_LEN+1 + DOCID_LEN), top.length() ) );
+          idf = (float) Math.log( (double) size / t.getCount() ); // Calculate inverse document frequency for term from gh(t).numberOfDocuments .
 
-        post.writeInt( Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ) ); // Write postings record for the token (documentID, termFrequency, OR rtf * idf) .
-        post.writeFloat( rtf * idf );
+          post.writeInt( Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ) ); // Write postings record for the token (documentID, termFrequency, OR rtf * idf) .
+          post.writeFloat( rtf * idf );
 
-        recordCount = recordCount + 1;
+          t.setRecCount(1); // Increment the number of postings for that record.
+
+          if(t.getStart() == -9) {
+            t.setStart(recordCount);  // Update the start field for the token in the global hash table.
+          }
+          recordCount = recordCount + 1;
+
+        } // If we've not exceeded the number of postings for the record.
+
       }
 
       post.close();
@@ -447,31 +454,6 @@ public class InvertedIndex {
       return s1.compareToIgnoreCase(s2);
     }
   }
-
-  /*
-  public static String convertText(String s, int limit) {
-    String out = "";
-    int len;
-
-    len = Math.min(s.length(),limit);
-
-    for(int i = 0; i < len; i++) {
-        if((int)s.charAt(i) > 127) {
-            out += "?";
-        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
-            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
-            out += s.charAt(i);
-        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
-            out += (char)((int)s.charAt(i) + 32);
-        }
-    }
-
-    if(out.length() > 7) {
-      out = out.substring(0,8);
-    }
-
-    return out;
-  }*/
 
   /** A method used to format a String record. It trims Strings to a particular length, and
   pads the output String with spaces. This is used to format records for the map.raf file.

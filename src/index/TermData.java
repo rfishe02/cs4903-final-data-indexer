@@ -14,7 +14,7 @@ public class TermData {
   private String term;
   private int docCount;
   private int start;
-  private float idf;
+  private int count;
 
   /**
   @param term A term.
@@ -25,6 +25,7 @@ public class TermData {
     this.term = term;
     this.docCount = docCount;
     this.start = -9;
+    this.count = 0;
   }
 
   public String toString() {
@@ -55,12 +56,12 @@ public class TermData {
     return start;
   }
 
-  public void setIDF(float idf) {
-    this.idf = idf;
+  public void setRecCount(int inc) {
+    this.count = this.count + inc;
   }
 
-  public float getIDF() {
-    return idf;
+  public int getRecCount() {
+    return count;
   }
 
 }

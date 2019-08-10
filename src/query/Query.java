@@ -354,12 +354,15 @@ public class Query {
         dict.seek( hash(entry.getKey(),i,seed) * (DICT_LEN + 2) );
         record = dict.readUTF();
         i++;
+
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) != 0);
 
       if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) == 0) {
 
         count = dict.readInt();
         start = dict.readInt();
+
+        System.out.println(count);
 
         post.seek( start * POST_LEN );
         for(int x = 0; x < count; x++) {
@@ -410,7 +413,7 @@ public class Query {
     while(j < k && !pq.isEmpty()) {
       r = pq.remove();
       res[j] = new File(inDir.getPath()+"/"+r.name);
-      System.out.println(r.name+" "+r.id+" "+r.score);
+      //System.out.println(r.name+" "+r.id+" "+r.score);
       j++;
     }
 
@@ -438,5 +441,31 @@ public class Query {
 
     return (float)( (tot) / (Math.sqrt(one) * Math.sqrt(two)) );
   }
+
+
+    /*
+    public static String convertText(String s, int limit) {
+      String out = "";
+      int len;
+
+      len = Math.min(s.length(),limit);
+
+      for(int i = 0; i < len; i++) {
+          if((int)s.charAt(i) > 127) {
+              out += "?";
+          } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
+              (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
+              out += s.charAt(i);
+          } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
+              out += (char)((int)s.charAt(i) + 32);
+          }
+      }
+
+      if(out.length() > 7) {
+        out = out.substring(0,8);
+      }
+
+      return out;
+    }*/
 
 }
