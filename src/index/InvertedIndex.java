@@ -33,11 +33,12 @@ public class InvertedIndex {
 
   public static void main(String[] args) {
 
+    /*
     seed = 1000;
     MAP_LEN = 100;
     args = new String[2];
     args[0] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean";
-    args[1] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index";
+    args[1] = "C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index";*/
 
     if(args == null || args.length < 2) {
 
@@ -224,7 +225,6 @@ public class InvertedIndex {
     TermData t;
     String read = "";
     String top = "";
-    int topInd = 0;
     int recordCount = 0;
     int nullCount = 0;
     float rtf;
@@ -241,23 +241,21 @@ public class InvertedIndex {
       RandomAccessFile post = new RandomAccessFile(outDir.getPath()+"/post.raf","rw"); // Create & open a new file for postings, post.raf .
       post.seek(0);
 
-      PriorityQueue<String> pq = new PriorityQueue<>( new StringComparator() );
+      PriorityQueue<String> pq = new PriorityQueue<>( new StringComparator() ); // Use a priority queue to arrange terms.
       while(!pq.isEmpty() || nullCount < br.length) {
         nullCount = 0;
 
         for(BufferedReader b : br) {
-
           read = b.readLine();
           if(read == null) {
             nullCount++;
           } else {
             pq.add(read);
           }
-
         }
 
         top = pq.remove();
-        //System.out.println(top.substring(0,STR_LEN).trim());
+        //System.out.println(top.substring(0,STR_LEN).trim() + " " + Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ));
 
         t = gh.get( top.substring(0,STR_LEN).trim() );
 
@@ -265,7 +263,7 @@ public class InvertedIndex {
         idf = (float) Math.log( (double) size / t.getCount() ); // Calculate inverse document frequency for term from gh(t).numberOfDocuments .
 
         if(t.getStart() == -9) {
-          t.setStart(recordCount);  // Update the start field for the token in the global hash table. ** FIX THIS, IT SHOULD HAPPEN ONCE PER TERM. **
+          t.setStart(recordCount);  // Update the start field for the token in the global hash table.
         }
 
         post.writeInt( Integer.parseInt( top.substring(STR_LEN+1,STR_LEN+1 + DOCID_LEN).trim() ) ); // Write postings record for the token (documentID, termFrequency, OR rtf * idf) .

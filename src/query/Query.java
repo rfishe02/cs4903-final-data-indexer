@@ -77,9 +77,6 @@ public class Query {
 
       // We may build the term-context matrix at this point.
 
-
-
-
       if(termMap.size() > 0 && docMap.size() > 0) {
         float[][] tdm = buildTDM(rafDir,termMap,docMap,q,Math.min(query.length,limit));
         result = getDocs(rafDir,docMap,tdm,10);
@@ -101,6 +98,7 @@ public class Query {
     String record;
     int i;
     int count;
+    int start;
 
     for(int a = 0; a < query.length; a++) {
 
@@ -115,7 +113,8 @@ public class Query {
       if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0 ) {
 
         count = dict.readInt();
-        pq.add( new Term(query[a],count,dict.readInt()) ); // Order terms by number of documents.
+        start = dict.readInt();
+        pq.add( new Term(query[a],count,start) ); // Order terms by number of documents.
 
       }
 
@@ -153,6 +152,7 @@ public class Query {
       for(int x = 0; x < query.count; x++) {
 
         docID = post.readInt();
+        post.readFloat();
 
         if(intersect.containsKey(docID)) {
           intersect.put(docID,intersect.get(docID)+1); // Count the number of times we see the document.
@@ -295,8 +295,6 @@ public class Query {
 
         count = dict.readInt();
         start = dict.readInt();
-
-        System.out.println(record+" "+start);
 
         post.seek( start * POST_LEN );
         for(int x = 0; x < count; x++) {
