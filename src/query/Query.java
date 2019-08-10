@@ -76,11 +76,7 @@ public class Query {
       File[] list = getIntersect(rafDir, inDir, pq);
 
       // We may build the term-context matrix at this point.
-
-      Semantic s = new Semantic();
-      HashMap<String,Integer> vocab = s.getVocab(list);
-      float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
-      String[] res = s.getContext(vocab,tcm,5,vocab.get("cat"));
+      // We could build a TDM to limit documents.
 
       /*
       mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
@@ -90,6 +86,11 @@ public class Query {
       } else {
         System.out.println("No results found.");
       }*/
+
+      Semantic s = new Semantic();
+      HashMap<String,Integer> vocab = s.getVocab(list);
+      float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
+      String[] res = s.getContext(vocab,tcm,5,vocab.get("cat")); // Testing in memory query.
 
     } catch(IOException ex) {
       ex.printStackTrace();
