@@ -313,7 +313,7 @@ public class InvertedIndex {
 
       if(gh.map[i] != null) {
         term = gh.map[i].getT();
-        count = gh.map[i].getCount();
+        count = gh.map[i].getRecCount();
         start = gh.map[i].getStart();
       } else {
         term = NA;
