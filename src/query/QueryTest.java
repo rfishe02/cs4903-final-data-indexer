@@ -30,7 +30,7 @@ public class QueryTest {
     String[] query = {"cat","toy"};
 
     Query q = new Query(rafDir,"stats.raf");
-    //String[] res = q.runQuery( new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean"), rafDir, query );
+    String[] res = q.runQuery( new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean"), rafDir, query );
 
     /*
     for(String s : res) {
@@ -40,13 +40,13 @@ public class QueryTest {
     }*/
 
 
-    PriorityQueue<Term> pq = q.getQueue(rafDir,query);
+    //PriorityQueue<Term> pq = q.getQueue(rafDir,query);
     /*
     while(!pq.isEmpty()) {
       System.out.println(pq.remove().count);
     }*/
 
-    q.getIntersect(rafDir,inDir,pq);
+    //q.getIntersect(rafDir,inDir,pq);
 
   }
 

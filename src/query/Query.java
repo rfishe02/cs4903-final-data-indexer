@@ -78,7 +78,9 @@ public class Query {
       // We may build the term-context matrix at this point.
 
       Semantic s = new Semantic();
-      
+      HashMap<String,Integer> vocab = s.getVocab(list);
+      float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
+      String[] res = s.getContext(vocab,tcm,5,vocab.get("cat"));
 
       /*
       mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
