@@ -212,7 +212,7 @@ public class Clean {
 
               if(!stopwords.contains(temp)) {
 
-                if( temp.length() > limit && idf > 3 && allDoc.get(temp) > 30 ) {
+                if( temp.length() > limit && idf > 5 && allDoc.get(temp) > 50 ) {
 
                   bw.write(temp+"\n");
 
