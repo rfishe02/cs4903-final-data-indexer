@@ -67,9 +67,15 @@ public class UAQuery {
     String[] result = null;
 
     try {
-      HashMap<Integer,Integer> docMap = new HashMap<Integer,Integer>(80000);
-      HashMap<String,Integer> termMap = new HashMap<String,Integer>(2000000);
-      HashMap<String,Integer> q = new HashMap<String,Integer>(1000);
+      HashMap<Integer,Integer> docMap = new HashMap<Integer,Integer>(100000);
+      HashMap<String,Integer> termMap = new HashMap<String,Integer>(10000000);
+      HashMap<String,Integer> q = new HashMap<String,Integer>(50);
+
+      PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+
+      for(String s : query) {
+        pq.add( new Term(s,) );
+      }
 
       mapRowsCols(inDir,rafDir,termMap,docMap,q,query);
       if(termMap.size() > 0 && docMap.size() > 0) {
@@ -87,6 +93,47 @@ public class UAQuery {
     return result;
   }
 
+  public PriorityQueue<Term> getQueue(String[] query) {
+
+    RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
+    PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
+    int i;
+    int count;
+
+    for(int i = 0; i < query.length; i++) {
+
+      i = 0;  // Find the term in the dictionary.
+      do {
+        dict.seek( hash(query[a],i,seed) * (DICT_LEN + 2) );
+        record = dict.readUTF();
+        i++;
+      } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
+
+      if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0 ) {
+
+        count = dict.readInt();
+        
+
+      }
+
+    }
+
+    dict.close();
+    return pq;
+  }
+
+  static class TermComparator implements Comparator<Term> {
+    public int compare(Term o1, Term o2) {
+      if(o1.count > o2.count) {
+        return 1;
+      } else if(o1.count < o2.count) {
+        return -1;
+      } else {
+        return 0;
+      }
+    }
+  }
+
   /** Uses the query array and random access files to map terms and document IDs to rows and columns.
   This information will be used to build the term document matrix.
   @param inDir The directory of tokenized files that UAInvertedIndex used to build the inverted index.
@@ -97,7 +144,7 @@ public class UAQuery {
   @param query A query as an array of words.
   */
 
-  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> q, String[] query) throws IOException {
+  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> q, PriorityQueue<Term> query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
     RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
@@ -112,12 +159,10 @@ public class UAQuery {
     int i;
 
     System.out.println("mapping terms and documents to rows and columns.");
-    Stemmer stem = new Stemmer();
 
     int end = Math.min(query.length,limit);
     for(int a = 0; a < end; a++) {
 
-      query[a] = stem.stemString(query[a]);
       query[a] = convertText(query[a],STR_LEN);
 
       if(!termMap.containsKey(query[a])) {
@@ -212,7 +257,6 @@ public class UAQuery {
         i++;
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(entry.getKey()) != 0);
 
-
       if(record.trim().compareToIgnoreCase(NA) != 0) {
 
         count = dict.readInt();
@@ -220,7 +264,7 @@ public class UAQuery {
 
         post.seek(( (start+1)-count ) * POST_LEN);
         for(int x = 0; x < count; x++) {
-          docID = post.readInt();
+          docID = post.readInt(); // Acquire document IDs.
           rtfIDF = post.readFloat();
 
           if(docMap.containsKey(docID)) {

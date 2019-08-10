@@ -27,11 +27,6 @@ public class Semantic {
 
     long startMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
 
-    Stemmer stem = new Stemmer();
-    for(int i = 2; i < args.length; i++) {
-      args[i] = formatString(stem,args[i]);
-    }
-
     try {
       File[] files = new File(args[0]).listFiles();
 
@@ -119,7 +114,7 @@ public class Semantic {
 
   /** This method uses a directory of tokenized files to build a term-context matrix.
     It requires an ArrayList of strings arranged in alphabetic order (the vocabulary).
-
+    
     It packs these terms into segments, which countTerms uses to count contextual terms.
     After the term-context matrix is complete, the method weightTerms calculate the
     PPMI for each non-zero value.
