@@ -70,27 +70,30 @@ public class Query {
     try {
       HashMap<Integer,Integer> docMap = new HashMap<Integer,Integer>(100000);
       HashMap<String,Integer> termMap = new HashMap<String,Integer>(10000000);
-      HashMap<String,Integer> q = new HashMap<String,Integer>(50);
+      HashMap<String,Integer> qMap = new HashMap<String,Integer>(50);
 
-      PriorityQueue<Term> pq = getQueue(rafDir,query); // Create a priority queue that ranks documents by count.
-      File[] list = getIntersect(rafDir, inDir, pq);
+      PriorityQueue<Term> pq = getQueue(rafDir, qMap, query); // Create a priority queue that ranks documents by count.
+      File[] list = getIntersect(rafDir, inDir, docMap, pq); // Get a subset of files, an intersection between sets.
 
-      // We may build the term-context matrix at this point.
-      // We could build a TDM to limit documents.
+      if(list.length > 0 && list[0] != null) {
 
-      /*
-      mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
-      if(termMap.size() > 0 && docMap.size() > 0) {
-        float[][] tdm = buildTDM(rafDir,termMap,docMap,q,Math.min(query.length,limit));
-        result = getDocs(rafDir,docMap,tdm,10);
+        mapTerms(list,termMap); // Map terms to rows.
+
+        float[][] tdm = buildTDM(rafDir,termMap,docMap,qMap,Math.min(query.length,limit)); // Build a term-document matrix to find the k most relevant documents.
+        list = getDocs(inDir,rafDir,docMap,tdm,10); // Get the k most relevant documents.
+
+        // We may build the term-context matrix at this point. -----------------
+
+        Semantic s = new Semantic();
+        HashMap<String,Integer> vocab = s.getVocab(list);
+        float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
+        result = s.getContext(vocab,tcm,5,vocab.get("cat")); // Testing in memory query.
+
+        //----------------------------------------------------------------------
+
       } else {
-        System.out.println("No results found.");
-      }*/
-
-      Semantic s = new Semantic();
-      HashMap<String,Integer> vocab = s.getVocab(list);
-      float[][] tcm = s.buildTermContextMatrix(list,vocab,vocab.size(),4);
-      String[] res = s.getContext(vocab,tcm,5,vocab.get("cat")); // Testing in memory query.
+        System.out.println("no results found.");
+      }
 
     } catch(IOException ex) {
       ex.printStackTrace();
@@ -100,7 +103,11 @@ public class Query {
     return result;
   }
 
-  public PriorityQueue<Term> getQueue(File rafDir, String[] query) throws IOException {
+  /** Create a queue of all terms, ranked by their number of documents.
+      It's used to find the smallest subset. This also gets statistics about the query.
+  */
+
+  public PriorityQueue<Term> getQueue(File rafDir, HashMap<String,Integer> qMap, String[] query) throws IOException {
     RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
     PriorityQueue<Term> pq = new PriorityQueue<>( new TermComparator() );
     String record;
@@ -109,6 +116,12 @@ public class Query {
     int start;
 
     for(int a = 0; a < query.length; a++) {
+
+      if(qMap.containsKey(query[a])) {
+        qMap.put(query[a],qMap.get(query[a])+1);
+      } else {
+        qMap.put(query[a],1);
+      }  // Count the frequency of terms in the query.
 
       i = 0;  // Find the term in the dictionary.
       do {
@@ -129,13 +142,19 @@ public class Query {
     return pq;
   }
 
-  public File[] getIntersect(File rafDir, File inDir, PriorityQueue<Term> pq) throws IOException {
+  /** Find the files that all terms have in common. Starting with the smallest subset, it counts the frequencies of documents for each term.
+      It returns an array of the most frequent documents (those that appear among all terms). This also maps documents to columns.
+   */
+
+  public File[] getIntersect(File rafDir, File inDir, HashMap<Integer,Integer> docMap, PriorityQueue<Term> pq) throws IOException {
     RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
     RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
     HashMap<Integer,Integer> intersect = new HashMap<>();
     Term query;
+    float rtfIDF;
     int docID;
     int size;
+    int col = 1;
 
     size = pq.size();
 
@@ -146,17 +165,19 @@ public class Query {
       for(int x = 0; x < query.count; x++) {
 
         docID = post.readInt();
-        post.readFloat();
+        rtfIDF = post.readFloat();
 
-        if(intersect.containsKey(docID)) {
-          intersect.put(docID,intersect.get(docID)+1); // Count the number of times we see the document.
-        } else {
-          intersect.put(docID,1);
-        }
+        if(rtfIDF > 0.0001) {
+          if(intersect.containsKey(docID)) {
+            intersect.put(docID,intersect.get(docID)+1); // Count the number of times we see the document.
+          } else {
+            intersect.put(docID,1);
+          }
+        } // Choose documents with high scores.
 
       } // Read each posting for the term.
 
-    } // Finding an intersection of documents.
+    } // Find an intersection of documents.
 
     File[] result = new File[intersect.size()];
     int x = 0;
@@ -167,12 +188,50 @@ public class Query {
         result[x] = new File(inDir.getPath()+"/"+(map.readUTF()).trim());
         x++;
 
+        if(!docMap.containsKey(entry.getKey())) {
+          docMap.put(entry.getKey(),col);
+          col++;
+        } // Map documents to cols.
+
       }
     }
 
     post.close();
     map.close();
     return result;
+  }
+
+  /** Uses the query array and random access files to map terms and document IDs to rows and columns.
+  This information will be used to build the term document matrix.
+  @param inDir The directory of tokenized files that UAInvertedIndex used to build the inverted index.
+  @param rafDir A directory of random access files generated by the UAInvertedIndex class.
+  @param termMap A hash table that maps terms to rows in the term document matrix.
+  @param docMap A hash table that maps document IDs to columns in the term document matrix.
+  @param q A hash table that will contain all distinct words in the query and their frequencies.
+  @param query A query as an array of words.
+  */
+
+  public void mapTerms(File[] files, HashMap<String,Integer> termMap) throws IOException {
+    BufferedReader br;
+    String read;
+    int row = 0;
+
+    System.out.println("mapping terms to rows.");
+
+    for(int i = 0; i < files.length; i++) {
+
+      if(files[i] != null) {
+        br = new BufferedReader( new FileReader(files[i]) );
+
+        while((read=br.readLine())!=null) {
+          if(!termMap.containsKey(read)) {
+            termMap.put(read,row);
+            row++;
+          }
+        } // Open file & map terms within to columns.
+      }
+
+    }
   }
 
   /** The same hash function used to construct the global hash table.
@@ -267,94 +326,6 @@ public class Query {
     }
   }
 
-  /** Uses the query array and random access files to map terms and document IDs to rows and columns.
-  This information will be used to build the term document matrix.
-  @param inDir The directory of tokenized files that UAInvertedIndex used to build the inverted index.
-  @param rafDir A directory of random access files generated by the UAInvertedIndex class.
-  @param termMap A hash table that maps terms to rows in the term document matrix.
-  @param docMap A hash table that maps document IDs to columns in the term document matrix.
-  @param q A hash table that will contain all distinct words in the query and their frequencies.
-  @param query A query as an array of words.
-  */
-
-  public void mapRowsCols(File inDir, File rafDir, HashMap<String,Integer> termMap, HashMap<Integer,Integer> docMap, HashMap<String,Integer> qMap, String[] query) throws IOException {
-    RandomAccessFile dict = new RandomAccessFile(rafDir.getPath()+"/dict.raf","r");
-    RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
-    RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
-    BufferedReader br;
-    String read;
-    String record;
-    int row = 0;
-    int col = 1; // Reserve the first column for the query.
-    int count;
-    int start;
-    int docID;
-    int i;
-
-    System.out.println("mapping terms and documents to rows and columns.");
-
-    int end = Math.min(query.length,limit);
-    for(int a = 0; a < end; a++) {
-
-      if(!termMap.containsKey(query[a])) {
-        termMap.put(query[a],row);
-        row++;
-      } // Map terms to rows.
-       if(qMap.containsKey(query[a])) {
-        qMap.put(query[a],qMap.get(query[a])+1);
-      } else {
-        qMap.put(query[a],1);
-      }  // Count the frequency of terms in the query.
-
-      i = 0;  // Find the term in the dictionary.
-      do {
-        dict.seek( hash(query[a],i,seed) * (DICT_LEN + 2) );
-        record = dict.readUTF();
-        i++;
-      } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
-
-      if(record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0) {
-
-        count = dict.readInt();
-        start = dict.readInt();
-
-        post.seek(start * POST_LEN);
-        for(int x = 0; x < count; x++) {
-
-          docID = post.readInt();
-
-          if(post.readFloat() > 0.001) {
-
-            if(!docMap.containsKey(docID)) {
-              docMap.put(docID,col);
-              col++;
-            } // Map document ID to a column.
-
-            map.seek(docID * (MAP_LEN + 2));
-            br = new BufferedReader(new InputStreamReader(new FileInputStream( inDir.getPath()+"/"+map.readUTF().trim() ), "UTF8"));
-
-            while((read=br.readLine())!=null) {
-
-              if(!termMap.containsKey(read)) {
-                termMap.put(read,row);
-                row++;
-              }
-            } // Open file & map terms within to columns.
-
-            br.close();
-          } // Accept if rtf - idf is more than a certain amount (may be a good idea to move this feature to the postings file).
-
-        } // Read each posting for the term.
-
-      }
-
-    } // Map terms & documets to columns.
-
-    dict.close();
-    post.close();
-    map.close();
-  }
-
   /** Uses hash tables, with term and document mappings, to construct the term document matrix.
   @param rafDir A directory of random access files generated by the UAInvertedIndex class.
   @param termMap A hash table that maps terms to rows in the term document matrix.
@@ -422,10 +393,10 @@ public class Query {
   @return A list of the top k documents with the greatest cosine similarity for a given query.
   */
 
-  public String[] getDocs(File rafDir, HashMap<Integer,Integer> docMap, float[][] tdm, int k) throws IOException {
+  public File[] getDocs(File inDir, File rafDir, HashMap<Integer,Integer> docMap, float[][] tdm, int k) throws IOException {
     RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
     PriorityQueue<Result> pq = new PriorityQueue<Result>( new ResultComparator() );
-    String[] res = new String[k];
+    File[] res = new File[k];
 
     System.out.println("finding relevant documents.");
 
@@ -438,7 +409,7 @@ public class Query {
     int j = 0;
     while(j < k && !pq.isEmpty()) {
       r = pq.remove();
-      res[j] = r.name.trim()+","+r.id+","+r.score;
+      res[j] = new File(inDir.getPath()+"/"+r.name);
       System.out.println(r.name+" "+r.id+" "+r.score);
       j++;
     }

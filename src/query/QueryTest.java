@@ -8,8 +8,9 @@ public class QueryTest {
 
   public static void main(String[] args) throws IOException {
 
+    /*
     File rafDir = new File(args[0]);
-    File inDir = new File(args[1]); //new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean")
+    File inDir = new File(args[1]);
 
     String[] query = new String[args.length-2];
 
@@ -20,7 +21,7 @@ public class QueryTest {
     }
 
     Query q = new Query(rafDir,"stats.raf");
-    String[] res = q.runQuery( inDir, rafDir, query );
+    String[] res = q.runQuery( inDir, rafDir, query );*/
 
     /*
     String[] query = {"one","two","three","four","five"};
@@ -36,7 +37,7 @@ public class QueryTest {
       System.out.println(pq.remove().count);
     }*/
 
-    /*
+
     File rafDir = new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index");
     File inDir = new File("C:/Users/fishe/Documents/GitHub/4903-final-data/output/clean");
 
@@ -44,12 +45,10 @@ public class QueryTest {
 
     Query q = new Query(rafDir,"stats.raf");
     String[] res = q.runQuery( new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean"), rafDir, query );
-    */
 
-    /*
-    for(String s : res) {
-      System.out.println(res);
-    }*/
+    for(String f : res) {
+      System.out.println(f);
+    }
 
     //PriorityQueue<Term> pq = q.getQueue(rafDir,query);
     /*
