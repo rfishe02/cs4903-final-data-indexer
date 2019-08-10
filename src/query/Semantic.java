@@ -12,59 +12,9 @@ import java.util.Comparator;
 import java.util.TreeSet;
 import java.util.ArrayList;
 import java.util.PriorityQueue;
-
-import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
+import java.util.HashMap;
 
 public class Semantic {
-
-  /** The main method retreives the vocabulary. The vocabulary provides the size of the term-context matrix
-    and the index locations of all terms to other methods.
-    @param args Accepts the commands [filename], [window], [word1], and optionally [word2] from the command line.
-  */
-
-  public static void main(String[] args) {
-
-    long startMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-
-    try {
-      File[] files = new File(args[0]).listFiles();
-
-      ArrayList<String> vocab = getVocab(files);
-      float[][] tcm = buildTermContextMatrix(files,vocab,vocab.size(),Integer.parseInt(args[1]) );
-
-      int u = wordSearch(vocab, args[2]);
-
-      if(u < 0) {
-        System.out.println(args[2] +" not found in vocab.");
-      } else {
-
-          if(args.length < 4) {
-            System.out.println("query: top 10 context words -- " + args[2]);
-            getContext(vocab,tcm,10,u);
-          } else {
-
-            int v = wordSearch(vocab,args[3]);
-
-            if(v < 0) {
-              System.out.println(args[3] +" not found in vocab.");
-            } else {
-              System.out.println("query: similarity -- " + args[2] +" & "+ args[3]);
-              System.out.println(calculateSimilarity(tcm,u,v));
-            }
-
-          }
-      }
-
-    } catch(Exception ex) {
-        ex.printStackTrace();
-        System.exit(1);
-    }
-
-    long endMemory = Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory();
-    System.out.println("end memory usage -- "+(endMemory/1000/1000/1000)+" GB");
-
-  }
 
   /** Pre-reads the file to obtain the vocabulary. It will be used to
     find the location of terms in the matrix.
@@ -78,12 +28,12 @@ public class Semantic {
     @return An array of terms arranged in alphabetic order.
   */
 
-  public static ArrayList<String> getVocab(File[] files) {
+  public static HashMap<String,Integer> getVocab(File[] files) {
     System.out.println("building vocab");
-    ArrayList<String> vocab = null;
+    HashMap<String,Integer> vocab = new HashMap<>();
+    int col = 0;
 
     try {
-      TreeSet<String> set = new TreeSet<>(new VocabComparator());
       BufferedReader br;
       String read;
 
@@ -91,17 +41,13 @@ public class Semantic {
 
         br = new BufferedReader(new FileReader(f));
         while((read = br.readLine())!=null) {
-          set.add(read);
+          if(!vocab.containsKey(read)) {
+            vocab.put(read,col);
+            col++;
+          }
         }
 
         br.close();
-      }
-
-      vocab = new ArrayList<>(set.size());
-
-      Iterator<String> it = set.iterator();
-      while(it.hasNext()) {
-        vocab.add(it.next());
       }
 
     } catch(IOException ex) {
@@ -114,7 +60,7 @@ public class Semantic {
 
   /** This method uses a directory of tokenized files to build a term-context matrix.
     It requires an ArrayList of strings arranged in alphabetic order (the vocabulary).
-    
+
     It packs these terms into segments, which countTerms uses to count contextual terms.
     After the term-context matrix is complete, the method weightTerms calculate the
     PPMI for each non-zero value.
@@ -385,22 +331,6 @@ public class Semantic {
     }
 
     return res;
-  }
-
-  /** A simple method that uses pre-processing steps on an input String.
-  @param stem A class that is capable of stemming.
-  @param str An input String.
-  @return A processed String.
-  */
-
-  public static String formatString(Stemmer stem, String str) {
-    str = stem.stemString(str);
-
-    if(str.length() > 7) {
-      str = str.substring(0,8);
-    }
-
-    return str;
   }
 
   /** The TreeMap in getVocab uses this class to arrange terms in alphabetic order. */

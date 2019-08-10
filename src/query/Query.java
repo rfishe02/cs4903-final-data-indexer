@@ -73,16 +73,21 @@ public class Query {
       HashMap<String,Integer> q = new HashMap<String,Integer>(50);
 
       PriorityQueue<Term> pq = getQueue(rafDir,query); // Create a priority queue that ranks documents by count.
-      mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
+      File[] list = getIntersect(rafDir, inDir, pq);
 
       // We may build the term-context matrix at this point.
 
+      Semantic s = new Semantic();
+      
+
+      /*
+      mapRowsCols(inDir,rafDir,termMap,docMap,q,query); // Map documents to rows & cols.
       if(termMap.size() > 0 && docMap.size() > 0) {
         float[][] tdm = buildTDM(rafDir,termMap,docMap,q,Math.min(query.length,limit));
         result = getDocs(rafDir,docMap,tdm,10);
       } else {
         System.out.println("No results found.");
-      }
+      }*/
 
     } catch(IOException ex) {
       ex.printStackTrace();
@@ -107,15 +112,12 @@ public class Query {
         dict.seek( hash(query[a],i,seed) * (DICT_LEN + 2) );
         record = dict.readUTF();
         i++;
-
       } while( i < seed && record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) != 0);
 
       if( record.trim().compareToIgnoreCase(NA) != 0 && record.trim().compareToIgnoreCase(query[a]) == 0 ) {
-
         count = dict.readInt();
         start = dict.readInt();
         pq.add( new Term(query[a],count,start) ); // Order terms by number of documents.
-
       }
 
     }
@@ -124,20 +126,9 @@ public class Query {
     return pq;
   }
 
-  static class TermComparator implements Comparator<Term> {
-    public int compare(Term o1, Term o2) {
-      if(o1.count > o2.count) {
-        return 1;
-      } else if(o1.count < o2.count) {
-        return -1;
-      } else {
-        return 0;
-      }
-    }
-  }
-
-  public File[] getIntersect(File rafDir, PriorityQueue<Term> pq) throws IOException {
+  public File[] getIntersect(File rafDir, File inDir, PriorityQueue<Term> pq) throws IOException {
     RandomAccessFile post = new RandomAccessFile(rafDir.getPath()+"/post.raf","r");
+    RandomAccessFile map = new RandomAccessFile(rafDir.getPath()+"/map.raf","r");
     HashMap<Integer,Integer> intersect = new HashMap<>();
     Term query;
     int docID;
@@ -164,13 +155,113 @@ public class Query {
 
     } // Finding an intersection of documents.
 
+    File[] result = new File[size];
+    int x = 0;
     for (Map.Entry<Integer,Integer> entry : intersect.entrySet()) {
       if(entry.getValue() >= size) {
-        System.out.println(entry.getKey());
+
+        map.seek(entry.getKey() * (MAP_LEN + 2));
+        result[x] = new File(inDir.getPath()+"/"+map.readUTF());
+        x++;
+
       }
     }
 
-    return null;
+    post.close();
+    map.close();
+    return result;
+  }
+
+  /** The same hash function used to construct the global hash table.
+  @param str A term of interest.
+  @param i An index.
+  @param n The size of the hash table.
+  @return A hashcode for a given String.
+  */
+
+  public int hash(String str, int i, int n) {
+    return ( Math.abs(str.hashCode()) + i ) % n;
+  } // h(k,i) = (h'(k) + i) mod m
+
+  /** */
+
+  static class TermComparator implements Comparator<Term> {
+    public int compare(Term o1, Term o2) {
+      if(o1.count > o2.count) {
+        return 1;
+      } else if(o1.count < o2.count) {
+        return -1;
+      } else {
+        return 0;
+      }
+    }
+  }
+
+  /** A function used to normalize a String, which uses the same techniques used in the
+  tokenization phase. It iterates over characters and converts non-ASCII characters to a
+  one byte character.
+  @param s An input String.
+  @param limit The desired length of a the resulting String.
+  @return A normalized String.
+  */
+
+  /* Substitute this method with the Tokenizer used to create the tokens for this project.
+    (Create a method that could accept the String and return a list.)
+  */
+
+  public String convertText(String s, int limit) {
+    String out = "";
+    int len;
+
+    len = Math.min(s.length(),limit);
+
+    for(int i = 0; i < len; i++) {
+        if((int)s.charAt(i) > 127) {
+            out += "?";
+        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
+            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
+            out += s.charAt(i);
+        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
+            out += (char)((int)s.charAt(i) + 32);
+        }
+    }
+
+    if(out.length() > 7) {
+      out = out.substring(0,8);
+    }
+
+    return out;
+  }
+
+  //============================================================================
+  // UNUSED METHODS
+  //============================================================================
+
+  /** A class used as the Comparator for the PriorityQueue in the getDocs method. */
+
+  static class ResultComparator implements Comparator<Result> {
+    public int compare(Result s1, Result s2) {
+      if(s1.score > s2.score) {
+        return -1;
+      } else if(s1.score < s2.score) {
+        return 1;
+      } else {
+        return 0;        }
+    }
+  }
+
+  /** A class that stores results for the getDocs method. */
+
+  static class Result {
+    String name;
+    float score;
+    int id;
+
+    public Result(String name, int id, float score) {
+      this.name = name;
+      this.id = id;
+      this.score = score;
+    }
   }
 
   /** Uses the query array and random access files to map terms and document IDs to rows and columns.
@@ -373,91 +464,5 @@ public class Query {
 
     return (float)( (tot) / (Math.sqrt(one) * Math.sqrt(two)) );
   }
-
-  /** The same hash function used to construct the global hash table.
-  @param str A term of interest.
-  @param i An index.
-  @param n The size of the hash table.
-  @return A hashcode for a given String.
-  */
-
-  public int hash(String str, int i, int n) {
-    return ( Math.abs(str.hashCode()) + i ) % n;
-  } // h(k,i) = (h'(k) + i) mod m
-
-  /** A function used to normalize a String, which uses the same techniques used in the
-  tokenization phase. It iterates over characters and converts non-ASCII characters to a
-  one byte character.
-  @param s An input String.
-  @param limit The desired length of a the resulting String.
-  @return A normalized String.
-  */
-
-  /* Substitute this method with the Tokenizer used to create the tokens for this project.
-    (Create a method that could accept the String and return a list.)
-  */
-
-  /*
-  public String convertText(String s, int limit) {
-    String out = "";
-    int len;
-
-    len = Math.min(s.length(),limit);
-
-    for(int i = 0; i < len; i++) {
-        if((int)s.charAt(i) > 127) {
-            out += "?";
-        } else if ( (int)s.charAt(i) > 47 && (int)s.charAt(i) < 58 ||
-            (int)s.charAt(i) > 96 && (int)s.charAt(i) < 123 ) {
-            out += s.charAt(i);
-        } else if( (int)s.charAt(i) > 64 && (int)s.charAt(i) < 91 ) {
-            out += (char)((int)s.charAt(i) + 32);
-        }
-    }
-
-    if(out.length() > 7) {
-      out = out.substring(0,8);
-    }
-
-    return out;
-  }*/
-
-  /** A class that stores results for the getDocs method. */
-
-  static class Result {
-    String name;
-    float score;
-    int id;
-
-    public Result(String name, int id, float score) {
-      this.name = name;
-      this.id = id;
-      this.score = score;
-    }
-  }
-
-  /** A class used as the Comparator for the PriorityQueue in the getDocs method. */
-
-  static class ResultComparator implements Comparator<Result> {
-    public int compare(Result s1, Result s2) {
-      if(s1.score > s2.score) {
-        return -1;
-      } else if(s1.score < s2.score) {
-        return 1;
-      } else {
-        return 0;        }
-    }
-  }
-
-  /*
-  public void printTDM(float[][] tdm) {
-    for(int a = 0; a < tdm.length; a++) {
-      System.out.printf("[ %-3s ] ",a);
-      for(int b = 0; b < tdm[0].length; b++) {
-        System.out.printf("%-3.2f ",tdm[a][b]);
-      }
-      System.out.println();
-    }
-  }*/
 
 }

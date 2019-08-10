@@ -23,10 +23,11 @@ public class QueryTest {
     }*/
 
     File rafDir = new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\index");
+    File inDir = new File("C:/Users/fishe/Documents/GitHub/4903-final-data/output/clean");
 
     //File inDir, File rafDir, String[] query
 
-    String[] query = {"cat"};
+    String[] query = {"cat","toy"};
 
     Query q = new Query(rafDir,"stats.raf");
     //String[] res = q.runQuery( new File("C:\\Users\\fishe\\Documents\\GitHub\\4903-final-data\\output\\clean"), rafDir, query );
@@ -45,7 +46,7 @@ public class QueryTest {
       System.out.println(pq.remove().count);
     }*/
 
-    q.getIntersect(rafDir,pq);
+    q.getIntersect(rafDir,inDir,pq);
 
   }
 
